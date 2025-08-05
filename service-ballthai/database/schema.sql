@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS `stadiums` (
     `id` INT PRIMARY KEY AUTO_INCREMENT,
     `name` VARCHAR(255) NOT NULL UNIQUE, -- ชื่อสนาม (ภาษาไทย)
     `name_en` VARCHAR(255),             -- ชื่อสนาม (ภาษาอังกฤษ)
-    `photo_url` VARCHAR(255)            -- URL รูปภาพสนาม
+    `photo_url` VARCHAR(255),            -- URL รูปภาพสนาม
+    `stadium_ref_id` INT UNIQUE          -- ID อ้างอิงจาก API
     -- สามารถเพิ่มคอลัมน์อื่นๆ ที่เกี่ยวกับสนามได้ที่นี่ เช่น `capacity` INT, `city` VARCHAR(255)
 );
 
@@ -29,6 +30,7 @@ CREATE TABLE IF NOT EXISTS `teams` (
     `website` VARCHAR(255),
     `shop` VARCHAR(255),
     `stadium_id` INT, -- Foreign Key อ้างอิงไปยังตาราง stadiums
+    `team_ref_id` INT UNIQUE, -- ID อ้างอิงจาก API
     FOREIGN KEY (`stadium_id`) REFERENCES `stadiums`(`id`)
 );
 
@@ -81,6 +83,7 @@ CREATE TABLE IF NOT EXISTS `coaches` (
     `birthday` DATE,                     -- วันเกิด
     `team_id` INT,                       -- Foreign Key อ้างอิงไปยังตาราง teams
     `nationality_id` INT,                -- Foreign Key อ้างอิงไปยังตาราง nationalities
+    `photo_url` VARCHAR(255),            -- URL รูปภาพโค้ช
     FOREIGN KEY (`team_id`) REFERENCES `teams`(`id`),
     FOREIGN KEY (`nationality_id`) REFERENCES `nationalities`(`id`)
 );
@@ -119,7 +122,9 @@ CREATE TABLE IF NOT EXISTS `matches` (
     `away_team_id` INT,                 -- Foreign Key อ้างอิงไปยังตาราง teams (ทีมเยือน)
     `channel_id` INT,                   -- Foreign Key อ้างอิงไปยังตาราง channels (ช่องทีวีหลัก)
     `live_channel_id` INT,              -- Foreign Key อ้างอิงไปยังตาราง channels (ช่องถ่ายทอดสด)
-    -- คุณสามารถเพิ่มคอลัมน์อื่นๆ ที่เกี่ยวข้องกับแมตช์ได้ที่นี่ เช่น `stadium_id`, `score_home`, `score_away`, `match_status`
+    `home_score` INT,                   -- คะแนนทีมเหย้า
+    `away_score` INT,                   -- คะแนนทีมเยือน
+    `match_status` VARCHAR(50),         -- สถานะการแข่งขัน (เช่น 'FINISHED', 'FIXTURE')
     FOREIGN KEY (`league_id`) REFERENCES `leagues`(`id`),
     FOREIGN KEY (`home_team_id`) REFERENCES `teams`(`id`),
     FOREIGN KEY (`away_team_id`) REFERENCES `teams`(`id`),
