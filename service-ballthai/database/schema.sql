@@ -1,0 +1,128 @@
+-- schema.sql
+-- ไฟล์นี้รวบรวมคำสั่ง SQL สำหรับสร้างตารางฐานข้อมูลทั้งหมด
+
+-- 1. สร้างตาราง leagues (ลีก)
+-- ตารางนี้เก็บข้อมูลลีกต่างๆ
+CREATE TABLE IF NOT EXISTS `leagues` (
+    `id` INT PRIMARY KEY AUTO_INCREMENT,
+    `name` VARCHAR(255) NOT NULL UNIQUE
+);
+
+-- 2. สร้างตาราง stadiums (สนาม)
+-- ตารางนี้เก็บข้อมูลสนามแข่งขัน
+CREATE TABLE IF NOT EXISTS `stadiums` (
+    `id` INT PRIMARY KEY AUTO_INCREMENT,
+    `name` VARCHAR(255) NOT NULL UNIQUE, -- ชื่อสนาม (ภาษาไทย)
+    `name_en` VARCHAR(255),             -- ชื่อสนาม (ภาษาอังกฤษ)
+    `photo_url` VARCHAR(255)            -- URL รูปภาพสนาม
+    -- สามารถเพิ่มคอลัมน์อื่นๆ ที่เกี่ยวกับสนามได้ที่นี่ เช่น `capacity` INT, `city` VARCHAR(255)
+);
+
+-- 3. สร้างตาราง teams (ทีม)
+-- ตารางนี้เก็บข้อมูลทีมฟุตบอล
+CREATE TABLE IF NOT EXISTS `teams` (
+    `id` INT PRIMARY KEY AUTO_INCREMENT,
+    `name_th` VARCHAR(255) NOT NULL UNIQUE,
+    `name_en` VARCHAR(255),
+    `logo_url` VARCHAR(255),
+    `team_post_ballthai` VARCHAR(255),
+    `website` VARCHAR(255),
+    `shop` VARCHAR(255),
+    `stadium_id` INT, -- Foreign Key อ้างอิงไปยังตาราง stadiums
+    FOREIGN KEY (`stadium_id`) REFERENCES `stadiums`(`id`)
+);
+
+-- 4. สร้างตาราง channels (ช่องทีวี)
+-- ตารางนี้เก็บข้อมูลช่องทางการถ่ายทอดสด
+CREATE TABLE IF NOT EXISTS `channels` (
+    `id` INT PRIMARY KEY AUTO_INCREMENT,
+    `name` VARCHAR(255) NOT NULL UNIQUE,
+    `logo_url` VARCHAR(255),
+    `type` VARCHAR(50) DEFAULT 'TV' -- เพิ่มคอลัมน์ 'type' เพื่อระบุประเภทของช่อง (เช่น 'TV', 'Live Stream', 'Website')
+);
+
+-- 5. สร้างตาราง nationalities (สัญชาติ)
+-- ตารางนี้เก็บข้อมูลสัญชาติสำหรับผู้เล่นและโค้ช
+CREATE TABLE IF NOT EXISTS `nationalities` (
+    `id` INT PRIMARY KEY AUTO_INCREMENT,
+    `code` VARCHAR(10) UNIQUE,           -- รหัสสัญชาติ (เช่น TH, EN)
+    `name` VARCHAR(255) NOT NULL UNIQUE, -- ชื่อสัญชาติ (เช่น ไทย, อังกฤษ)
+    `flag_url` VARCHAR(255)              -- URL รูปภาพธงชาติ
+);
+
+-- 6. สร้างตาราง players (ผู้เล่น)
+-- ตารางนี้เก็บข้อมูลและสถิติของผู้เล่น
+CREATE TABLE IF NOT EXISTS `players` (
+    `id` INT PRIMARY KEY AUTO_INCREMENT,
+    `player_ref_id` INT UNIQUE,          -- ID อ้างอิงจาก API หรือแหล่งข้อมูลอื่น
+    `league_id` INT,                     -- Foreign Key อ้างอิงไปยังตาราง leagues
+    `team_id` INT,                       -- Foreign Key อ้างอิงไปยังตาราง teams
+    `nationality_id` INT,                -- Foreign Key อ้างอิงไปยังตาราง nationalities
+    `name` VARCHAR(255) NOT NULL,        -- ชื่อผู้เล่น
+    `full_name_en` VARCHAR(255),         -- ชื่อเต็มภาษาอังกฤษ
+    `shirt_number` INT,                  -- หมายเลขเสื้อ
+    `position` VARCHAR(50),              -- ตำแหน่ง (เช่น FW, MF, DF, GK)
+    `photo_url` VARCHAR(255),            -- URL รูปภาพผู้เล่น
+    `matches_played` INT DEFAULT 0,      -- จำนวนนัดที่ลงเล่น
+    `goals` INT DEFAULT 0,               -- จำนวนประตูที่ทำได้
+    `yellow_cards` INT DEFAULT 0,        -- จำนวนใบเหลือง
+    `red_cards` INT DEFAULT 0,           -- จำนวนใบแดง
+    FOREIGN KEY (`league_id`) REFERENCES `leagues`(`id`),
+    FOREIGN KEY (`team_id`) REFERENCES `teams`(`id`),
+    FOREIGN KEY (`nationality_id`) REFERENCES `nationalities`(`id`)
+);
+
+-- 7. สร้างตาราง coaches (โค้ช)
+-- ตารางนี้เก็บข้อมูลโค้ช
+CREATE TABLE IF NOT EXISTS `coaches` (
+    `id` INT PRIMARY KEY AUTO_INCREMENT,
+    `coach_ref_id` INT UNIQUE,           -- ID อ้างอิงจาก API หรือแหล่งข้อมูลอื่น
+    `name` VARCHAR(255) NOT NULL,
+    `birthday` DATE,                     -- วันเกิด
+    `team_id` INT,                       -- Foreign Key อ้างอิงไปยังตาราง teams
+    `nationality_id` INT,                -- Foreign Key อ้างอิงไปยังตาราง nationalities
+    FOREIGN KEY (`team_id`) REFERENCES `teams`(`id`),
+    FOREIGN KEY (`nationality_id`) REFERENCES `nationalities`(`id`)
+);
+
+-- 8. สร้างตาราง league_standings (ตารางคะแนนลีก)
+-- ตารางนี้เก็บข้อมูลตารางคะแนน/อันดับของแต่ละทีมในแต่ละลีก
+CREATE TABLE IF NOT EXISTS `league_standings` (
+    `id` INT PRIMARY KEY AUTO_INCREMENT,
+    `league_id` INT NOT NULL,           -- Foreign Key อ้างอิงไปยังตาราง leagues
+    `team_id` INT NOT NULL,             -- Foreign Key อ้างอิงไปยังตาราง teams
+    `round` INT,                        -- รอบการแข่งขัน (ถ้ามี)
+    `matches_played` INT DEFAULT 0,     -- จำนวนนัดที่ลงแข่ง
+    `wins` INT DEFAULT 0,               -- จำนวนนัดที่ชนะ
+    `draws` INT DEFAULT 0,              -- จำนวนนัดที่เสมอ
+    `losses` INT DEFAULT 0,             -- จำนวนนัดที่แพ้
+    `goals_for` INT DEFAULT 0,          -- จำนวนประตูที่ยิงได้
+    `goals_against` INT DEFAULT 0,      -- จำนวนประตูที่เสียไป
+    `goal_difference` INT DEFAULT 0,    -- ผลต่างประตูได้เสีย
+    `points` INT DEFAULT 0,             -- คะแนนรวม
+    `current_rank` INT,                 -- อันดับปัจจุบัน
+    UNIQUE (`league_id`, `team_id`),    -- กำหนดให้แต่ละทีมมีข้อมูลคะแนนเดียวในแต่ละลีก
+    FOREIGN KEY (`league_id`) REFERENCES `leagues`(`id`),
+    FOREIGN KEY (`team_id`) REFERENCES `teams`(`id`)
+);
+
+
+-- 9. สร้างตาราง matches (แมตช์การแข่งขัน)
+-- ตารางนี้เก็บข้อมูลการแข่งขันแต่ละนัด
+CREATE TABLE IF NOT EXISTS `matches` (
+    `id` INT PRIMARY KEY AUTO_INCREMENT,
+    `match_ref_id` INT UNIQUE NOT NULL, -- ID อ้างอิงจาก API ที่ไม่ซ้ำกัน
+    `start_date` DATE NOT NULL,
+    `start_time` TIME NOT NULL,
+    `league_id` INT,                    -- Foreign Key อ้างอิงไปยังตาราง leagues
+    `home_team_id` INT,                 -- Foreign Key อ้างอิงไปยังตาราง teams (ทีมเหย้า)
+    `away_team_id` INT,                 -- Foreign Key อ้างอิงไปยังตาราง teams (ทีมเยือน)
+    `channel_id` INT,                   -- Foreign Key อ้างอิงไปยังตาราง channels (ช่องทีวีหลัก)
+    `live_channel_id` INT,              -- Foreign Key อ้างอิงไปยังตาราง channels (ช่องถ่ายทอดสด)
+    -- คุณสามารถเพิ่มคอลัมน์อื่นๆ ที่เกี่ยวข้องกับแมตช์ได้ที่นี่ เช่น `stadium_id`, `score_home`, `score_away`, `match_status`
+    FOREIGN KEY (`league_id`) REFERENCES `leagues`(`id`),
+    FOREIGN KEY (`home_team_id`) REFERENCES `teams`(`id`),
+    FOREIGN KEY (`away_team_id`) REFERENCES `teams`(`id`),
+    FOREIGN KEY (`channel_id`) REFERENCES `channels`(`id`),
+    FOREIGN KEY (`live_channel_id`) REFERENCES `channels`(`id`)
+);
