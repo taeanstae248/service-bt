@@ -34,7 +34,9 @@ func (h *Handler) SetupRoutes() *http.ServeMux {
 	mux.HandleFunc("/api/teams", h.GetTeams)
 	mux.HandleFunc("/api/stadiums", h.GetStadiums)
 	mux.HandleFunc("/api/matches", h.GetMatches)
-	mux.HandleFunc("/api/teams/", h.GetTeamByID) // Handle /api/teams/{id}
+	mux.HandleFunc("/api/teams/", h.GetTeamByID)                      // Handle /api/teams/{id}
+	mux.HandleFunc("/api/team-matches/", h.GetTeamMatches)            // Handle /api/team-matches/{id}
+	mux.HandleFunc("/api/team-matches-post/", h.GetTeamMatchesByPost) // Handle /api/team-matches-post/{team_post_ballthai}
 
 	// Static file serving for images
 	mux.Handle("/images/", http.StripPrefix("/images/", http.FileServer(http.Dir("./img/"))))
@@ -416,6 +418,353 @@ func (h *Handler) GetTeamByID(w http.ResponseWriter, r *http.Request) {
 	response := Response{
 		Success: true,
 		Data:    team,
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
+// GetTeamMatches returns upcoming and past matches for a specific team
+func (h *Handler) GetTeamMatches(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Extract team ID from URL path (e.g., /api/team-matches/123)
+	path := strings.TrimPrefix(r.URL.Path, "/api/team-matches/")
+	teamID, err := strconv.Atoi(path)
+	if err != nil {
+		http.Error(w, "Invalid team ID", http.StatusBadRequest)
+		return
+	}
+
+	// Get query parameter for limit
+	limit := r.URL.Query().Get("limit")
+	if limit == "" {
+		limit = "5" // Default limit per section for team matches
+	}
+
+	type TeamMatch struct {
+		ID           int     `json:"id"`
+		MatchRefID   int     `json:"match_ref_id"`
+		HomeTeamID   int     `json:"home_team_id"`
+		AwayTeamID   int     `json:"away_team_id"`
+		LeagueID     int     `json:"league_id"`
+		StartDate    *string `json:"start_date"`
+		StartTime    *string `json:"start_time"`
+		HomeScore    *int    `json:"home_score"`
+		AwayScore    *int    `json:"away_score"`
+		MatchStatus  *string `json:"match_status"`
+		HomeTeamName *string `json:"home_team_name"`
+		AwayTeamName *string `json:"away_team_name"`
+		OpponentName *string `json:"opponent_name"`
+		IsHome       bool    `json:"is_home"`
+		LeagueName   *string `json:"league_name"`
+	}
+
+	// Query for upcoming matches of the team (>= today)
+	upcomingQuery := `
+		SELECT m.id, m.match_ref_id, m.home_team_id, m.away_team_id, m.league_id,
+		       m.start_date, m.start_time, m.home_score, m.away_score, m.match_status,
+		       ht.name_th as home_team_name, at.name_th as away_team_name, 
+		       CASE 
+		           WHEN m.home_team_id = ? THEN at.name_th 
+		           ELSE ht.name_th 
+		       END as opponent_name,
+		       CASE WHEN m.home_team_id = ? THEN true ELSE false END as is_home,
+		       l.name as league_name
+		FROM matches m
+		LEFT JOIN teams ht ON m.home_team_id = ht.id
+		LEFT JOIN teams at ON m.away_team_id = at.id
+		LEFT JOIN leagues l ON m.league_id = l.id
+		WHERE (m.home_team_id = ? OR m.away_team_id = ?) 
+		AND m.start_date >= CURDATE()
+		ORDER BY m.start_date ASC, m.start_time ASC 
+		LIMIT ?
+	`
+
+	// Query for past matches of the team (< today)
+	pastQuery := `
+		SELECT m.id, m.match_ref_id, m.home_team_id, m.away_team_id, m.league_id,
+		       m.start_date, m.start_time, m.home_score, m.away_score, m.match_status,
+		       ht.name_th as home_team_name, at.name_th as away_team_name,
+		       CASE 
+		           WHEN m.home_team_id = ? THEN at.name_th 
+		           ELSE ht.name_th 
+		       END as opponent_name,
+		       CASE WHEN m.home_team_id = ? THEN true ELSE false END as is_home,
+		       l.name as league_name
+		FROM matches m
+		LEFT JOIN teams ht ON m.home_team_id = ht.id
+		LEFT JOIN teams at ON m.away_team_id = at.id
+		LEFT JOIN leagues l ON m.league_id = l.id
+		WHERE (m.home_team_id = ? OR m.away_team_id = ?) 
+		AND m.start_date < CURDATE()
+		ORDER BY m.start_date DESC, m.start_time DESC 
+		LIMIT ?
+	`
+
+	// Execute upcoming matches query
+	upcomingRows, err := h.DB.Query(upcomingQuery, teamID, teamID, teamID, teamID, limit)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer upcomingRows.Close()
+
+	var upcomingMatches []TeamMatch
+	for upcomingRows.Next() {
+		var match TeamMatch
+		err := upcomingRows.Scan(
+			&match.ID,
+			&match.MatchRefID,
+			&match.HomeTeamID,
+			&match.AwayTeamID,
+			&match.LeagueID,
+			&match.StartDate,
+			&match.StartTime,
+			&match.HomeScore,
+			&match.AwayScore,
+			&match.MatchStatus,
+			&match.HomeTeamName,
+			&match.AwayTeamName,
+			&match.OpponentName,
+			&match.IsHome,
+			&match.LeagueName,
+		)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		upcomingMatches = append(upcomingMatches, match)
+	}
+
+	// Execute past matches query
+	pastRows, err := h.DB.Query(pastQuery, teamID, teamID, teamID, teamID, limit)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer pastRows.Close()
+
+	var pastMatches []TeamMatch
+	for pastRows.Next() {
+		var match TeamMatch
+		err := pastRows.Scan(
+			&match.ID,
+			&match.MatchRefID,
+			&match.HomeTeamID,
+			&match.AwayTeamID,
+			&match.LeagueID,
+			&match.StartDate,
+			&match.StartTime,
+			&match.HomeScore,
+			&match.AwayScore,
+			&match.MatchStatus,
+			&match.HomeTeamName,
+			&match.AwayTeamName,
+			&match.OpponentName,
+			&match.IsHome,
+			&match.LeagueName,
+		)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		pastMatches = append(pastMatches, match)
+	}
+
+	// Create response with both upcoming and past matches for the team
+	type TeamMatchesResponse struct {
+		Upcoming []TeamMatch `json:"upcoming"`
+		Past     []TeamMatch `json:"past"`
+	}
+
+	response := Response{
+		Success: true,
+		Data: TeamMatchesResponse{
+			Upcoming: upcomingMatches,
+			Past:     pastMatches,
+		},
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
+// GetTeamMatchesByPost returns upcoming and past matches for a specific team by team_post_ballthai
+func (h *Handler) GetTeamMatchesByPost(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Extract team_post_ballthai from URL path (e.g., /api/team-matches-post/93458)
+	path := strings.TrimPrefix(r.URL.Path, "/api/team-matches-post/")
+	teamPostBallthai := path
+	if teamPostBallthai == "" {
+		http.Error(w, "Invalid team_post_ballthai", http.StatusBadRequest)
+		return
+	}
+
+	// First, get team ID from team_post_ballthai
+	var teamID int
+	teamQuery := `SELECT id FROM teams WHERE team_post_ballthai = ?`
+	err := h.DB.QueryRow(teamQuery, teamPostBallthai).Scan(&teamID)
+	if err == sql.ErrNoRows {
+		response := Response{
+			Success: false,
+			Message: "Team not found with the provided team_post_ballthai",
+		}
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(response)
+		return
+	} else if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Get query parameter for limit
+	limit := r.URL.Query().Get("limit")
+	if limit == "" {
+		limit = "5" // Default limit per section for team matches
+	}
+
+	type TeamMatch struct {
+		ID           int     `json:"id"`
+		MatchRefID   int     `json:"match_ref_id"`
+		HomeTeamID   int     `json:"home_team_id"`
+		AwayTeamID   int     `json:"away_team_id"`
+		LeagueID     int     `json:"league_id"`
+		StartDate    *string `json:"start_date"`
+		StartTime    *string `json:"start_time"`
+		HomeScore    *int    `json:"home_score"`
+		AwayScore    *int    `json:"away_score"`
+		MatchStatus  *string `json:"match_status"`
+		HomeTeamName *string `json:"home_team_name"`
+		AwayTeamName *string `json:"away_team_name"`
+		OpponentName *string `json:"opponent_name"`
+		IsHome       bool    `json:"is_home"`
+		LeagueName   *string `json:"league_name"`
+	}
+
+	// Query for upcoming matches of the team (>= today)
+	upcomingQuery := `
+		SELECT m.id, m.match_ref_id, m.home_team_id, m.away_team_id, m.league_id,
+		       m.start_date, m.start_time, m.home_score, m.away_score, m.match_status,
+		       ht.name_th as home_team_name, at.name_th as away_team_name, 
+		       CASE 
+		           WHEN m.home_team_id = ? THEN at.name_th 
+		           ELSE ht.name_th 
+		       END as opponent_name,
+		       CASE WHEN m.home_team_id = ? THEN true ELSE false END as is_home,
+		       l.name as league_name
+		FROM matches m
+		LEFT JOIN teams ht ON m.home_team_id = ht.id
+		LEFT JOIN teams at ON m.away_team_id = at.id
+		LEFT JOIN leagues l ON m.league_id = l.id
+		WHERE (m.home_team_id = ? OR m.away_team_id = ?) 
+		AND m.start_date >= CURDATE()
+		ORDER BY m.start_date ASC, m.start_time ASC 
+		LIMIT ?
+	`
+
+	// Query for past matches of the team (< today)
+	pastQuery := `
+		SELECT m.id, m.match_ref_id, m.home_team_id, m.away_team_id, m.league_id,
+		       m.start_date, m.start_time, m.home_score, m.away_score, m.match_status,
+		       ht.name_th as home_team_name, at.name_th as away_team_name,
+		       CASE 
+		           WHEN m.home_team_id = ? THEN at.name_th 
+		           ELSE ht.name_th 
+		       END as opponent_name,
+		       CASE WHEN m.home_team_id = ? THEN true ELSE false END as is_home,
+		       l.name as league_name
+		FROM matches m
+		LEFT JOIN teams ht ON m.home_team_id = ht.id
+		LEFT JOIN teams at ON m.away_team_id = at.id
+		LEFT JOIN leagues l ON m.league_id = l.id
+		WHERE (m.home_team_id = ? OR m.away_team_id = ?) 
+		AND m.start_date < CURDATE()
+		ORDER BY m.start_date DESC, m.start_time DESC 
+		LIMIT ?
+	`
+
+	// Execute upcoming matches query
+	upcomingRows, err := h.DB.Query(upcomingQuery, teamID, teamID, teamID, teamID, limit)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer upcomingRows.Close()
+
+	var upcomingMatches []TeamMatch
+	for upcomingRows.Next() {
+		var match TeamMatch
+		err := upcomingRows.Scan(
+			&match.ID,
+			&match.MatchRefID,
+			&match.HomeTeamID,
+			&match.AwayTeamID,
+			&match.LeagueID,
+			&match.StartDate,
+			&match.StartTime,
+			&match.HomeScore,
+			&match.AwayScore,
+			&match.MatchStatus,
+			&match.HomeTeamName,
+			&match.AwayTeamName,
+			&match.OpponentName,
+			&match.IsHome,
+			&match.LeagueName,
+		)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		upcomingMatches = append(upcomingMatches, match)
+	}
+
+	// Execute past matches query
+	pastRows, err := h.DB.Query(pastQuery, teamID, teamID, teamID, teamID, limit)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer pastRows.Close()
+
+	var pastMatches []TeamMatch
+	for pastRows.Next() {
+		var match TeamMatch
+		err := pastRows.Scan(
+			&match.ID,
+			&match.MatchRefID,
+			&match.HomeTeamID,
+			&match.AwayTeamID,
+			&match.LeagueID,
+			&match.StartDate,
+			&match.StartTime,
+			&match.HomeScore,
+			&match.AwayScore,
+			&match.MatchStatus,
+			&match.HomeTeamName,
+			&match.AwayTeamName,
+			&match.OpponentName,
+			&match.IsHome,
+			&match.LeagueName,
+		)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		pastMatches = append(pastMatches, match)
+	}
+
+	// Create response with both upcoming and past matches for the team
+	type TeamMatchesResponse struct {
+		Upcoming []TeamMatch `json:"upcoming"`
+		Past     []TeamMatch `json:"past"`
+	}
+
+	response := Response{
+		Success: true,
+		Data: TeamMatchesResponse{
+			Upcoming: upcomingMatches,
+			Past:     pastMatches,
+		},
 	}
 
 	json.NewEncoder(w).Encode(response)
