@@ -4,83 +4,60 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	// "strings" // Removed: 'strings' is not directly used in this file
-	// "go-scraper/models" // Removed: 'go-scraper/models' is not directly used in this file
+
+	// "go-ballthai-scraper/models" // ลบออก: ไม่ได้ใช้ models ในไฟล์นี้โดยตรง
 )
 
-// GetNationalityID checks if nationality exists by code, inserts if not, and returns ID
-func GetNationalityID(db *sql.DB, code, name string) (int, error) {
+// GetNationalityID retrieves the nationality ID by its code.
+// If the nationality does not exist, it inserts a new nationality record and returns its ID.
+func GetNationalityID(db *sql.DB, code string, name string) (int, error) {
 	var nationalityID int
 	query := "SELECT id FROM nationalities WHERE code = ?"
 	err := db.QueryRow(query, code).Scan(&nationalityID)
 
 	if err == sql.ErrNoRows {
-		// Insert new nationality
+		// Nationality does not exist, insert a new one
 		insertQuery := `INSERT INTO nationalities (code, name) VALUES (?, ?)`
-		result, err := db.Exec(insertQuery, code, name)
+		res, err := db.Exec(insertQuery, code, name)
 		if err != nil {
 			return 0, fmt.Errorf("failed to insert new nationality %s: %w", name, err)
 		}
-		newID, err := result.LastInsertId()
+		id, err := res.LastInsertId()
 		if err != nil {
 			return 0, fmt.Errorf("failed to get last insert ID for nationality %s: %w", name, err)
 		}
-		log.Printf("Inserted new nationality: %s (ID: %d)", name, newID)
-		return int(newID), nil
+		log.Printf("Inserted new nationality: %s (ID: %d)", name, id)
+		return int(id), nil
 	} else if err != nil {
-		return 0, fmt.Errorf("failed to query nationality by code %s: %w", code, err)
+		return 0, fmt.Errorf("error checking existing nationality %s: %w", name, err)
 	}
-	log.Printf("Found existing nationality: %s (ID: %d)", name, nationalityID)
+	// Nationality exists, return its ID
 	return nationalityID, nil
 }
 
-// GetChannelID checks if channel exists by name, inserts if not, and returns ID
-func GetChannelID(db *sql.DB, name, logoURL, channelType string) (int, error) {
+// GetChannelID retrieves the channel ID by its name and type.
+// If the channel does not exist, it inserts a new channel record and returns its ID.
+func GetChannelID(db *sql.DB, channelName string, logoURL string, channelType string) (int, error) {
 	var channelID int
-	query := "SELECT id FROM channels WHERE REPLACE(name, ' ', '') = REPLACE(?, ' ', '')"
-	err := db.QueryRow(query, name).Scan(&channelID)
+	query := "SELECT id FROM channels WHERE name = ? AND type = ?"
+	err := db.QueryRow(query, channelName, channelType).Scan(&channelID)
 
 	if err == sql.ErrNoRows {
-		// Insert new channel
+		// Channel does not exist, insert a new one
 		insertQuery := `INSERT INTO channels (name, logo_url, type) VALUES (?, ?, ?)`
-		result, err := db.Exec(insertQuery, name, logoURL, channelType)
+		res, err := db.Exec(insertQuery, channelName, logoURL, channelType)
 		if err != nil {
-			return 0, fmt.Errorf("failed to insert new channel %s: %w", name, err)
+			return 0, fmt.Errorf("failed to insert new channel %s (%s): %w", channelName, channelType, err)
 		}
-		newID, err := result.LastInsertId()
+		id, err := res.LastInsertId()
 		if err != nil {
-			return 0, fmt.Errorf("failed to get last insert ID for channel %s: %w", name, err)
+			return 0, fmt.Errorf("failed to get last insert ID for channel %s (%s): %w", channelName, channelType, err)
 		}
-		log.Printf("Inserted new channel: %s (ID: %d)", name, newID)
-		return int(newID), nil
+		log.Printf("Inserted new channel: %s (%s) (ID: %d)", channelName, channelType, id)
+		return int(id), nil
 	} else if err != nil {
-		return 0, fmt.Errorf("failed to query channel by name %s: %w", name, err)
+		return 0, fmt.Errorf("error checking existing channel %s (%s): %w", channelName, channelType, err)
 	}
-	log.Printf("Found existing channel: %s (ID: %d)", name, channelID)
+	// Channel exists, return its ID
 	return channelID, nil
-}
-
-// GetLeagueID checks if league exists by name, inserts if not, and returns ID
-func GetLeagueID(db *sql.DB, leagueName, leagueNameThai string) (int, error) {
-	var leagueID int
-	query := "SELECT id FROM leagues WHERE REPLACE(name, ' ', '') = REPLACE(?, ' ', '') OR REPLACE(name, ' ', '') = REPLACE(?, ' ', '')"
-	err := db.QueryRow(query, leagueName, leagueNameThai).Scan(&leagueID)
-
-	if err == sql.ErrNoRows {
-		insertQuery := `INSERT INTO leagues (name) VALUES (?)`
-		result, err := db.Exec(insertQuery, leagueNameThai) // Use Thai name as primary name
-		if err != nil {
-			return 0, fmt.Errorf("failed to insert new league %s: %w", leagueNameThai, err)
-		}
-		newID, err := result.LastInsertId()
-		if err != nil {
-			return 0, fmt.Errorf("failed to get last insert ID for league %s: %w", leagueNameThai, err)
-		}
-		log.Printf("Inserted new league: %s (ID: %d)", leagueNameThai, newID)
-		return int(newID), nil
-	} else if err != nil {
-		return 0, fmt.Errorf("failed to query league by name %s: %w", leagueNameThai, err)
-	}
-	log.Printf("Found existing league: %s (ID: %d)", leagueNameThai, leagueID)
-	return leagueID, nil
 }

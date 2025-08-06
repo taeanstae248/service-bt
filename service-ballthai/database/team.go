@@ -4,9 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	// เพิ่ม import ที่จำเป็นอื่นๆ ที่นี่ เช่น "time" หากมีการใช้ Date/Time
 	
-	"go-ballthai-scraper/models" // แก้ไข: ตรวจสอบให้แน่ใจว่า import เฉพาะแพ็กเกจ models
+	"go-ballthai-scraper/models" // Ensure this module name matches your go.mod
 )
 
 // GetTeamIDByThaiName retrieves the team ID by its Thai name.

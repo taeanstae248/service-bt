@@ -1,6 +1,6 @@
 package models
 
-import "database/sql" // Added for sql.NullInt64, sql.NullString
+import "database/sql"
 
 // MatchAPI represents the structure of match data from the API
 type MatchAPI struct {
@@ -20,7 +20,7 @@ type MatchAPI struct {
 	LiveInfo          ChannelAPI `json:"live_info"`    // Live streaming channel
 	HomeGoalCount     int        `json:"home_goal_count"`
 	AwayGoalCount     int        `json:"away_goal_count"`
-	MatchStatus       string     `json:"match_status"` // e.g., "2" for finished, "1" for fixture
+	MatchStatus       interface{} `json:"match_status"` // Changed to interface{} to handle inconsistent types (number or string)
 	StageName         string     `json:"stage_name"`
 	StageNameEN       string     `json:"stage_en"` // Corrected JSON tag based on typical API responses
 }

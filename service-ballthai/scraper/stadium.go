@@ -2,7 +2,8 @@ package scraper
 
 import (
 	"database/sql"
-	"fmt" // fmt is used for fmt.Errorf and fmt.Sprintf
+	"encoding/json" // Added for json.Unmarshal
+	"fmt"
 	"log"
 	// "path/filepath" // Not directly used in this file
 	// "time" // Not directly used in this file
@@ -42,6 +43,27 @@ func ScrapeStadiums(db *sql.DB) error {
 				}
 			}
 
+			// Handle Country field which might be string or object
+			countryName := ""
+			countryCode := ""
+			if apiStadium.Country != nil {
+				// Try to unmarshal as CountryAPI struct
+				var countryObj models.CountryAPI
+				if err := json.Unmarshal(apiStadium.Country, &countryObj); err == nil {
+					countryName = countryObj.Name
+					countryCode = countryObj.Code
+				} else {
+					// If it failed, try to unmarshal as a string
+					var countryStr string
+					if err := json.Unmarshal(apiStadium.Country, &countryStr); err == nil {
+						countryName = countryStr // Store the string directly as name
+						// No code available from string, leave empty
+					} else {
+						log.Printf("Warning: Could not unmarshal country field for stadium %s. Raw: %s, Error: %v", apiStadium.Name, string(apiStadium.Country), err)
+					}
+				}
+			}
+
 			// Get Team ID (if club_names exists and is relevant)
 			teamID := sql.NullInt64{Valid: false}
 			if len(apiStadium.ClubNames) > 0 {
@@ -69,8 +91,8 @@ func ScrapeStadiums(db *sql.DB) error {
 				Latitude:        sql.NullFloat64{Float64: apiStadium.Latitude, Valid: apiStadium.Latitude != 0},
 				Longitude:       sql.NullFloat64{Float64: apiStadium.Longitude, Valid: apiStadium.Longitude != 0},
 				PhotoURL:        sql.NullString{String: photoFilename, Valid: photoFilename != ""}, // Store filename
-				CountryName:     sql.NullString{String: apiStadium.Country.Name, Valid: apiStadium.Country.Name != ""},
-				CountryCode:     sql.NullString{String: apiStadium.Country.Code, Valid: apiStadium.Country.Code != ""},
+				CountryName:     sql.NullString{String: countryName, Valid: countryName != ""},   // Use parsed country name
+				CountryCode:     sql.NullString{String: countryCode, Valid: countryCode != ""},   // Use parsed country code
 				TeamID:          teamID,
 			}
 

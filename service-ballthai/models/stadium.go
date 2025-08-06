@@ -1,12 +1,15 @@
 package models
 
-import "database/sql" // Added for sql.NullString, sql.NullInt64, sql.NullFloat64
+import (
+	"database/sql" // Added for sql.NullString, sql.NullInt64, sql.NullFloat64
+	"encoding/json" // Added for json.RawMessage
+)
 
 // StadiumAPI represents the structure of stadium data from the API
 type StadiumAPI struct {
 	ID             int           `json:"id"`
 	Photo          string        `json:"photo"`
-	Country        CountryAPI    `json:"country"`
+	Country        json.RawMessage `json:"country"` // Changed to json.RawMessage to handle inconsistent types (string or object)
 	ClubNames      []ClubNameAPI `json:"club_names"` // Array of club names, usually only one relevant
 	Name           string        `json:"name"`
 	ShortName      string        `json:"short_name"`

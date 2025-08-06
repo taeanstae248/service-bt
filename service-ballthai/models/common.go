@@ -1,7 +1,5 @@
 package models
 
-// "database/sql" // Removed: 'database/sql' is not directly used in this file
-
 // NationalityAPI represents the nationality data from the API
 type NationalityAPI struct {
 	Code     string `json:"code"`

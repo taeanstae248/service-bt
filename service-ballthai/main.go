@@ -81,57 +81,72 @@ func main() {
 	// 3. เริ่มต้นการ Scrape ข้อมูล
 	log.Println("Starting data scraping process...")
 
-	// Scrape ข้อมูลสนาม (ควรทำก่อนทีม เพราะทีมอาจอ้างอิง stadium_id)
-	log.Println("Scraping Stadiums...")
-	err = scraper.ScrapeStadiums(db)
-	if err != nil {
-		log.Printf("Error scraping stadiums: %v", err)
-	} else {
-		log.Println("Stadiums scraping completed.")
+	// *** ขั้นตอนสำคัญ: ตรวจสอบและเพิ่มลีกในฐานข้อมูลก่อนเสมอ ***
+	log.Println("Ensuring Leagues exist in DB...")
+	leaguesToEnsure := []string{
+		"T1", "T2", "T3 Bangkok", "T3 East", "T3 West", "T3 North", "T3 Northeast", "T3 South",
+		"Samipro", "Revo League Cup", "FA Cup", "BGC Cup", "Thai League Playoff",
 	}
+	for _, leagueName := range leaguesToEnsure {
+		_, err := database.GetLeagueID(db, leagueName) // GetLeagueID จะเพิ่มลีกถ้ายังไม่มี
+		if err != nil {
+			log.Printf("Error ensuring league %s exists: %v", leagueName, err)
+		}
+	}
+	log.Println("Leagues ensured in DB.")
+
+
+	// Scrape ข้อมูลสนาม (ควรทำก่อนทีม เพราะทีมอาจอ้างอิง stadium_id)
+	// log.Println("Scraping Stadiums...")
+	// err = scraper.ScrapeStadiums(db)
+	// if err != nil {
+	// 	log.Printf("Error scraping stadiums: %v", err)
+	// } else {
+	// 	log.Println("Stadiums scraping completed.")
+	// }
 
 	// Scrape ข้อมูลโค้ช (อ้างอิง nationality และ team)
-	log.Println("Scraping Coaches...")
-	err = scraper.ScrapeCoach(db)
-	if err != nil {
-		log.Printf("Error scraping coaches: %v", err)
-	} else {
-		log.Println("Coaches scraping completed.")
-	}
+	// log.Println("Scraping Coaches...")
+	// err = scraper.ScrapeCoach(db)
+	// if err != nil {
+	// 	log.Printf("Error scraping coaches: %v", err)
+	// } else {
+	// 	log.Println("Coaches scraping completed.")
+	// }
 
 	// Scrape ข้อมูลผู้เล่น (อ้างอิง nationality และ team)
-	log.Println("Scraping Players...")
-	err = scraper.ScrapePlayers(db)
-	if err != nil {
-		log.Printf("Error scraping players: %v", err)
-	} else {
-		log.Println("Players scraping completed.")
-	}
+	// log.Println("Scraping Players...")
+	// err = scraper.ScrapePlayers(db)
+	// if err != nil {
+	// 	log.Printf("Error scraping players: %v", err)
+	// } else {
+	// 	log.Println("Players scraping completed.")
+	// }
 
 	// Scrape ข้อมูลตารางคะแนน (อ้างอิง league และ team)
-	log.Println("Scraping Standings...")
-	err = scraper.ScrapeStandings(db)
-	if err != nil {
-		log.Printf("Error scraping standings: %v", err)
-	} else {
-		log.Println("Standings scraping completed.")
-	}
+	// log.Println("Scraping Standings...")
+	// err = scraper.ScrapeStandings(db)
+	// if err != nil {
+	// 	log.Printf("Error scraping standings: %v", err)
+	// } else {
+	// 	log.Println("Standings scraping completed.")
+	// }
 
 	// Scrape ข้อมูลแมตช์ (อ้างอิง league, home_team, away_team, channel)
 	log.Println("Scraping Matches (Thaileague, Cup, Playoff)...")
-	// err = scraper.ScrapeThaileagueMatches(db) // ถ้าต้องการเรียกทั้งหมด
+	// err = scraper.ScrapeThaileagueMatches(db, "all") // ถ้าต้องการเรียกทั้งหมด
 	err = scraper.ScrapeThaileagueMatches(db, "t1") // เรียกเฉพาะ T1
 	if err != nil {
 		log.Printf("Error scraping Thaileague matches: %v", err)
 	}
 	err = scraper.ScrapeBallthaiCupMatches(db)
-	if err != nil {
-		log.Printf("Error scraping Ballthai Cup matches: %v", err)
-	}
-	err = scraper.ScrapeThaileaguePlayoffMatches(db)
-	if err != nil {
-		log.Printf("Error scraping Thaileague Playoff matches: %v", err)
-	}
+	// if err != nil {
+	// 	log.Printf("Error scraping Ballthai Cup matches: %v", err)
+	// }
+	// err = scraper.ScrapeThaileaguePlayoffMatches(db)
+	// if err != nil {
+	// 	log.Printf("Error scraping Thaileague Playoff matches: %v", err)
+	// }
 	log.Println("Match scraping initiated. (Check logs for success/failure)")
 
 	log.Println("Data scraping process finished.")
