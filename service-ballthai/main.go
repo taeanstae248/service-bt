@@ -86,41 +86,59 @@ func main() {
 	// 3. Start data scraping process
 	log.Println("Starting data scraping process...")
 
-	// // Scrape Stadium data
-	// log.Println("Scraping Stadiums...")
-	// err = scraper.ScrapeStadiums(db)
-	// if err != nil {
-	// 	log.Printf("Error scraping stadiums: %v", err)
-	// } else {
-	// 	log.Println("Stadiums scraping completed.")
-	// }
+	// Scrape Leagues first - this is critical for foreign key relationships
+	log.Println("Scraping Leagues...")
+	err = scraper.ScrapeLeagues(db)
+	if err != nil {
+		log.Printf("Error scraping leagues: %v", err)
+	} else {
+		log.Println("Leagues scraping completed.")
+	}
 
-	// // Scrape Coach data
-	// log.Println("Scraping Coaches...")
-	// err = scraper.ScrapeCoach(db)
-	// if err != nil {
-	// 	log.Printf("Error scraping coaches: %v", err)
-	// } else {
-	// 	log.Println("Coaches scraping completed.")
-	// }
+	// Scrape Stadium data
+	log.Println("Scraping Stadiums...")
+	err = scraper.ScrapeStadiums(db)
+	if err != nil {
+		log.Printf("Error scraping stadiums: %v", err)
+	} else {
+		log.Println("Stadiums scraping completed.")
+	}
+
+	// Scrape Teams - may be created during other scraping processes
+	log.Println("Scraping Teams...")
+	err = scraper.ScrapeTeams(db)
+	if err != nil {
+		log.Printf("Error scraping teams: %v", err)
+	} else {
+		log.Println("Teams scraping completed.")
+	}
+
+	// Scrape Coach data
+	log.Println("Scraping Coaches...")
+	err = scraper.ScrapeCoach(db)
+	if err != nil {
+		log.Printf("Error scraping coaches: %v", err)
+	} else {
+		log.Println("Coaches scraping completed.")
+	}
 
 	// Scrape Player data
-	// log.Println("Scraping Players...")
-	// err = scraper.ScrapePlayers(db)
-	// if err != nil {
-	// 	log.Printf("Error scraping players: %v", err)
-	// } else {
-	// 	log.Println("Players scraping completed.")
-	// }
+	log.Println("Scraping Players...")
+	err = scraper.ScrapePlayers(db)
+	if err != nil {
+		log.Printf("Error scraping players: %v", err)
+	} else {
+		log.Println("Players scraping completed.")
+	}
 
-	// // Scrape Standing data
-	// log.Println("Scraping Standings...")
-	// err = scraper.ScrapeStandings(db)
-	// if err != nil {
-	// 	log.Printf("Error scraping standings: %v", err)
-	// } else {
-	// 	log.Println("Standings scraping completed.")
-	// }
+	// Scrape Standing data
+	log.Println("Scraping Standings...")
+	err = scraper.ScrapeStandings(db)
+	if err != nil {
+		log.Printf("Error scraping standings: %v", err)
+	} else {
+		log.Println("Standings scraping completed.")
+	}
 
 	// Update team_post_ballthai from external API
 	log.Println("Updating team_post_ballthai...")
