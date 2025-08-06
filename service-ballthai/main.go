@@ -105,13 +105,13 @@ func main() {
 	// }
 
 	// Scrape Player data
-	log.Println("Scraping Players...")
-	err = scraper.ScrapePlayers(db)
-	if err != nil {
-		log.Printf("Error scraping players: %v", err)
-	} else {
-		log.Println("Players scraping completed.")
-	}
+	// log.Println("Scraping Players...")
+	// err = scraper.ScrapePlayers(db)
+	// if err != nil {
+	// 	log.Printf("Error scraping players: %v", err)
+	// } else {
+	// 	log.Println("Players scraping completed.")
+	// }
 
 	// // Scrape Standing data
 	// log.Println("Scraping Standings...")
@@ -122,21 +122,30 @@ func main() {
 	// 	log.Println("Standings scraping completed.")
 	// }
 
-	// // Scrape Match data
-	// log.Println("Scraping Matches (Thaileague, Cup, Playoff)...")
-	// err = scraper.ScrapeThaileagueMatches(db, "all") // Pass "all" to scrape all Thai Leagues
-	// if err != nil {
-	// 	log.Printf("Error scraping Thaileague matches: %v", err)
-	// }
-	// err = scraper.ScrapeBallthaiCupMatches(db)
-	// if err != nil {
-	// 	log.Printf("Error scraping Ballthai Cup matches: %v", err)
-	// }
-	// err = scraper.ScrapeThaileaguePlayoffMatches(db)
-	// if err != nil {
-	// 	log.Printf("Error scraping Thaileague Playoff matches: %v", err)
-	// }
-	// log.Println("Match scraping initiated. (Check logs for success/failure)")
+	// Update team_post_ballthai from external API
+	log.Println("Updating team_post_ballthai...")
+	err = scraper.UpdateTeamPostBallthai(db)
+	if err != nil {
+		log.Printf("Error updating team_post_ballthai: %v", err)
+	} else {
+		log.Println("team_post_ballthai update completed.")
+	}
+
+	// Scrape Match data
+	log.Println("Scraping Matches (Thaileague, Cup, Playoff)...")
+	err = scraper.ScrapeThaileagueMatches(db, "all") // Pass "all" to scrape all Thai Leagues
+	if err != nil {
+		log.Printf("Error scraping Thaileague matches: %v", err)
+	}
+	err = scraper.ScrapeBallthaiCupMatches(db)
+	if err != nil {
+		log.Printf("Error scraping Ballthai Cup matches: %v", err)
+	}
+	err = scraper.ScrapeThaileaguePlayoffMatches(db)
+	if err != nil {
+		log.Printf("Error scraping Thaileague Playoff matches: %v", err)
+	}
+	log.Println("Match scraping initiated. (Check logs for success/failure)")
 
 	log.Println("Data scraping process finished.")
 }
