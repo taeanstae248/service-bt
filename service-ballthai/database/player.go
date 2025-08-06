@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	"go-scraper/models" // ตรวจสอบให้แน่ใจว่าชื่อโมดูลตรงกับ go.mod ของคุณ
+	"go-ballthai-scraper/models" // ตรวจสอบให้แน่ใจว่าชื่อโมดูลตรงกับ go.mod ของคุณ
 )
 
 // InsertOrUpdatePlayer inserts or updates a player record in the database

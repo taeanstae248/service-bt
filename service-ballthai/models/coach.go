@@ -2,7 +2,7 @@ package models
 
 import (
 	"database/sql"
-	"time" // For time.Time
+	// "time" // Removed: 'time' is not directly used in this file
 )
 
 // CoachAPI represents the structure of coach data from the API

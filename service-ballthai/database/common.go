@@ -4,9 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"strings"
-
-	"go-scraper/models" // ตรวจสอบให้แน่ใจว่าชื่อโมดูลตรงกับ go.mod ของคุณ
+	// "strings" // Removed: 'strings' is not directly used in this file
+	// "go-scraper/models" // Removed: 'go-scraper/models' is not directly used in this file
 )
 
 // GetNationalityID checks if nationality exists by code, inserts if not, and returns ID

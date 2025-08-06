@@ -3,6 +3,7 @@ package scraper
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -38,8 +39,9 @@ func FetchAndParseAPI(url string, v interface{}) error {
 	return nil
 }
 
-// DownloadImage downloads an image from a URL and saves it to a specified path.
-// It returns the saved path or an error.
+// DownloadImage downloads an image from a URL and saves it to a specified directory.
+// It returns the saved filename (e.g., "image.png") or an error.
+// The actual file will be saved at filepath.Join(saveDir, returned_filename).
 func DownloadImage(imageURL, saveDir string) (string, error) {
 	if imageURL == "" {
 		return "", fmt.Errorf("image URL cannot be empty")
@@ -63,8 +65,8 @@ func DownloadImage(imageURL, saveDir string) (string, error) {
 
 	// Check if the file already exists
 	if _, err := os.Stat(savePath); err == nil {
-		// log.Printf("Image already exists: %s", savePath)
-		return savePath, nil // If it exists, no need to download again
+		log.Printf("Image already exists: %s", savePath)
+		return fileName, nil // If it exists, return just the filename
 	}
 
 	log.Printf("Downloading image from: %s to %s", imageURL, savePath)
@@ -90,5 +92,5 @@ func DownloadImage(imageURL, saveDir string) (string, error) {
 	}
 
 	log.Printf("Image downloaded successfully: %s", savePath)
-	return savePath, nil
+	return fileName, nil // Return just the filename
 }

@@ -1,6 +1,6 @@
 package models
 
-import "database/sql" // Added for sql.NullString, sql.NullInt64, sql.NullFloat64, sql.NullTime
+// "database/sql" // Removed: 'database/sql' is not directly used in this file
 
 // NationalityAPI represents the nationality data from the API
 type NationalityAPI struct {

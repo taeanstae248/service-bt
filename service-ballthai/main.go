@@ -5,44 +5,37 @@ import (
 	"fmt"
 	"log"
 	"os"
-	// "time" // ยังคงใช้สำหรับ time.Parse ในบางส่วนของ scraper
+	// "time" // ลบออกหรือ comment เพราะไม่ได้ใช้ใน main.go โดยตรง
 
 	_ "github.com/go-sql-driver/mysql" // Driver สำหรับ MySQL
 	"github.com/joho/godotenv"         // สำหรับโหลด .env
 
-	"go-scraper/database" // แก้ไข: เปลี่ยนเป็นชื่อโมดูลที่ถูกต้องตาม go.mod
-	"go-scraper/scraper"  // แก้ไข: เปลี่ยนเป็นชื่อโมดูลที่ถูกต้องตาม go.mod
+	"go-ballthai-scraper/database" // แก้ไข: เปลี่ยนเป็นชื่อโมดูลที่ถูกต้องตาม go.mod
+	"go-ballthai-scraper/scraper"  // แก้ไข: เปลี่ยนเป็นชื่อโมดูลที่ถูกต้องตาม go.mod
 )
 
 var db *sql.DB // ตัวแปร Global สำหรับเก็บ Connection ฐานข้อมูล
 
 func main() {
-	// 0. ตรวจสอบว่าไฟล์ .env มีอยู่และสามารถอ่านได้หรือไม่
-	if _, err := os.Stat(".env"); os.IsNotExist(err) {
-		log.Fatalf("Error: .env file not found in the current directory (%s). Please create it.", os.Getenv("PWD"))
-	} else if err != nil {
-		log.Fatalf("Error checking .env file: %v", err)
-	}
-
-	// โหลดค่าจาก .env ไฟล์
+	// โหลดค่าจาก .env ไฟล์ก่อน
 	log.Println("Attempting to load .env file...")
 	err := godotenv.Load()
 	if err != nil {
-		// หาก godotenv.Load() มี Error ให้ Fatalf ทันทีเพื่อดูสาเหตุ
-		log.Fatalf("Critical Error loading .env file: %v. Please ensure the .env file is correctly formatted and accessible.", err)
+		log.Printf("Error loading .env file: %v. Assuming environment variables are set directly.", err)
+		// ไม่ต้อง Fatalf ที่นี่ เพราะอาจจะรันบน Server ที่ตั้งค่า env vars โดยตรง
 	} else {
 		log.Println(".env file loaded successfully.")
 	}
 
 	// 1. ตั้งค่าการเชื่อมต่อฐานข้อมูล
-	// ดึงค่าจาก Environment Variables (ตอนนี้ควรจะมาจาก .env แล้ว)
+	// ดึงค่าจาก Environment Variables
 	dbUser := os.Getenv("DB_USERNAME")
 	dbPass := os.Getenv("DB_PASSWORD")
 	dbHost := os.Getenv("DB_HOST")
 	dbPort := os.Getenv("DB_PORT")
 	dbName := os.Getenv("DB_NAME")
 
-	// *** เพิ่ม Log เพื่อตรวจสอบค่าที่ได้มาอีกครั้ง ***
+	// *** เพิ่ม Log เพื่อตรวจสอบค่าที่ได้มา ***
 	log.Printf("DEBUG: DB_USERNAME: '%s'", dbUser)
 	log.Printf("DEBUG: DB_PASSWORD: '%s' (length: %d)", dbPass, len(dbPass)) // ตรวจสอบความยาวของรหัสผ่าน
 	log.Printf("DEBUG: DB_HOST: '%s'", dbHost)
@@ -50,7 +43,6 @@ func main() {
 	log.Printf("DEBUG: DB_NAME: '%s'", dbName)
 
 	// ตรวจสอบว่าค่าที่จำเป็นถูกตั้งค่าหรือไม่
-	// *** แก้ไขเงื่อนไขสำหรับ DB_PASSWORD: ถ้าเป็นค่าว่างแต่ตั้งใจให้ว่าง ก็ไม่ควร Fatalf ***
 	// ในกรณีของ XAMPP, root มักไม่มีรหัสผ่าน
 	if dbUser == "" || dbHost == "" || dbPort == "" || dbName == "" {
 		log.Fatalf("Missing one or more essential database environment variables (DB_USERNAME, DB_HOST, DB_PORT, DB_NAME)")
@@ -127,7 +119,8 @@ func main() {
 
 	// Scrape ข้อมูลแมตช์ (อ้างอิง league, home_team, away_team, channel)
 	log.Println("Scraping Matches (Thaileague, Cup, Playoff)...")
-	err = scraper.ScrapeThaileagueMatches(db)
+	// err = scraper.ScrapeThaileagueMatches(db) // ถ้าต้องการเรียกทั้งหมด
+	err = scraper.ScrapeThaileagueMatches(db, "t1") // เรียกเฉพาะ T1
 	if err != nil {
 		log.Printf("Error scraping Thaileague matches: %v", err)
 	}

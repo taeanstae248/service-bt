@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	"go-scraper/models" // ตรวจสอบให้แน่ใจว่าชื่อโมดูลตรงกับ go.mod ของคุณ
+	"go-ballthai-scraper/models" // ตรวจสอบให้แน่ใจว่าชื่อโมดูลตรงกับ go.mod ของคุณ
 )
 
 // InsertOrUpdateMatch inserts or updates a match record in the database
