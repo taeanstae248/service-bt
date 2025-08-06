@@ -7,37 +7,37 @@ import (
 	// The 'fmt' package was imported but not used, causing a compile error.
 	// It has been removed.
 
-	"go-ballthai-scraper/database" // Ensure this module name matches your go.mod
-	"go-ballthai-scraper/models"  // Ensure this module name matches your go.mod
+	"go-ballthai-scraper/database" // ตรวจสอบให้แน่ใจว่าชื่อโมดูลตรงกับ go.mod ของคุณ
+	"go-ballthai-scraper/models"  // ตรวจสอบให้แน่ใจว่าชื่อโมดูลตรงกับ go.mod ของคุณ
 )
 
-// ScrapeStandings scrapes league standings data from the API and saves it to the database
+// ScrapeStandings ดึงข้อมูลตารางคะแนนลีกจาก API และบันทึกลงฐานข้อมูล
 func ScrapeStandings(db *sql.DB) error {
-	// Map PHP's $_GET['table'] values to API URLs and DB league IDs
+	// แมปค่า $_GET['table'] ของ PHP กับ URL API และ DB league ID
 	standingConfigs := map[string]struct {
 		URL      string
-		LeagueID int // Corresponds to your DB league ID
+		LeagueID int // สอดคล้องกับ League ID ใน DB ของคุณ
 		IsT3     bool
 	}{
-		"t1": {URL: "https://competition.tl.prod.c0d1um.io/thaileague/api/stage-standing-public/?tournament=207", LeagueID: 1}, // Example: map to DB league ID 1
-		"t2": {URL: "https://competition.tl.prod.c0d1um.io/thaileague/api/stage-standing-public/?tournament=196", LeagueID: 2}, // Example: map to DB league ID 2
-		"t3": {URL: "https://competition.tl.prod.c0d1um.io/thaileague/api/stage-standing-public/?tournament=197", LeagueID: 3, IsT3: true}, // Example: map to DB league ID 3, special handling for T3
-		"samipro": {URL: "https://competition.tl.prod.c0d1um.io/thaileague/api/stage-standing-public/dashboard/?tournament=206", LeagueID: 59}, // Example: map to DB league ID 59
-		"revo": {URL: "https://competition.tl.prod.c0d1um.io/thaileague/api/stage-standing-public/?tournament=155", LeagueID: 4}, // Example: map to DB league ID 4
-		// Add more configurations as needed
+		"t1": {URL: "https://competition.tl.prod.c0d1um.io/thaileague/api/stage-standing-public/?tournament=207", LeagueID: 1}, // ตัวอย่าง: แมปกับ DB league ID 1
+		"t2": {URL: "https://competition.tl.prod.c0d1um.io/thaileague/api/stage-standing-public/?tournament=196", LeagueID: 2}, // ตัวอย่าง: แมปกับ DB league ID 2
+		"t3": {URL: "https://competition.tl.prod.c0d1um.io/thaileague/api/stage-standing-public/?tournament=197", LeagueID: 3, IsT3: true}, // ตัวอย่าง: แมปกับ DB league ID 3, การจัดการพิเศษสำหรับ T3
+		"samipro": {URL: "https://competition.tl.prod.c0d1um.io/thaileague/api/stage-standing-public/dashboard/?tournament=206", LeagueID: 59}, // ตัวอย่าง: แมปกับ DB league ID 59
+		"revo": {URL: "https://competition.tl.prod.c0d1um.io/thaileague/api/stage-standing-public/?tournament=155", LeagueID: 4}, // ตัวอย่าง: แมปกับ DB league ID 4
+		// เพิ่มการกำหนดค่าเพิ่มเติมตามความจำเป็น
 	}
 
 	for configName, config := range standingConfigs {
 		log.Printf("Scraping standings for %s (%s)", configName, config.URL)
 		
-		var apiResponse []models.StandingAPI // API for standings returns an array directly
+		var apiResponse []models.StandingAPI // API สำหรับตารางคะแนนคืนค่าเป็น array โดยตรง
 		err := FetchAndParseAPI(config.URL, &apiResponse)
 		if err != nil {
 			log.Printf("Error fetching standings for %s: %v", configName, err)
 			continue
 		}
 
-		// Special handling for T3 (SOUTH stage) as seen in PHP
+		// การจัดการพิเศษสำหรับ T3 (SOUTH stage) ตามที่เห็นใน PHP
 		if config.IsT3 {
 			filteredResponse := []models.StandingAPI{}
 			for _, s := range apiResponse {
@@ -49,16 +49,21 @@ func ScrapeStandings(db *sql.DB) error {
 		}
 
 		for _, apiStanding := range apiResponse {
-			// Get Team ID
+			// รับ Team ID
 			teamID := 0
-			tID, err := database.GetTeamIDByThaiName(db, apiStanding.TournamentTeamName, apiStanding.TournamentTeamLogo)
-			if err != nil {
-				log.Printf("Warning: Failed to get team ID for standing team %s: %v", apiStanding.TournamentTeamName, err)
-				continue // Skip if team ID cannot be resolved
+			if apiStanding.TournamentTeamName != "" {
+				tID, err := database.GetTeamIDByThaiName(db, apiStanding.TournamentTeamName, apiStanding.TournamentTeamLogo)
+				if err != nil {
+					log.Printf("Warning: Failed to get team ID for standing team %s: %v", apiStanding.TournamentTeamName, err)
+					continue // ข้ามหากไม่สามารถแก้ไข Team ID ได้
+				}
+				teamID = tID
+			} else {
+				log.Printf("Warning: Standing entry for %s has no team name, skipping.", configName)
+				continue
 			}
-			teamID = tID
 
-			// Prepare StandingDB struct
+			// เตรียมโครงสร้าง StandingDB
 			standingDB := models.StandingDB{
 				LeagueID:       config.LeagueID,
 				TeamID:         teamID,
@@ -71,11 +76,11 @@ func ScrapeStandings(db *sql.DB) error {
 				GoalDifference: apiStanding.GoalDifference,
 				Points:         apiStanding.Point,
 				CurrentRank:    sql.NullInt64{Int64: int64(apiStanding.CurrentRank), Valid: apiStanding.CurrentRank != 0},
-				// Round is often not directly in standing API, might need to be derived or set to NULL
-				Round:          sql.NullInt64{Valid: false}, // Default to null if not available
+				// Round มักจะไม่ได้อยู่ใน Standing API โดยตรง อาจต้องถูกดึงมาหรือตั้งค่าเป็น NULL
+				Round:          sql.NullInt64{Valid: false}, // ค่าเริ่มต้นเป็น null หากไม่พร้อมใช้งาน
 			}
 
-			// Insert or Update standing in DB
+			// แทรกหรืออัปเดตตารางคะแนนใน DB
 			err = database.InsertOrUpdateStanding(db, standingDB)
 			if err != nil {
 				log.Printf("Error saving standing for team %s in league %s to DB: %v", apiStanding.TournamentTeamName, configName, err)

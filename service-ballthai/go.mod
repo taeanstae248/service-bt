@@ -7,6 +7,9 @@ require (
 	github.com/joho/godotenv v1.5.1 // เพิ่มไลบรารีสำหรับโหลด .env
 )
 
-require filippo.io/edwards25519 v1.1.0 // indirect
+require (
+	filippo.io/edwards25519 v1.1.0 // indirect
+	github.com/robfig/cron/v3 v3.0.1 // indirect
+)
 
 // สามารถเพิ่ม require อื่นๆ ได้ในอนาคต หากใช้ไลบรารีเพิ่มเติม

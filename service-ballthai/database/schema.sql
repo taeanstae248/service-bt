@@ -12,10 +12,20 @@ CREATE TABLE IF NOT EXISTS `leagues` (
 -- ตารางนี้เก็บข้อมูลสนามแข่งขัน
 CREATE TABLE IF NOT EXISTS `stadiums` (
     `id` INT PRIMARY KEY AUTO_INCREMENT,
-    `name` VARCHAR(255) NOT NULL UNIQUE, -- ชื่อสนาม (ภาษาไทย)
-    `name_en` VARCHAR(255),             -- ชื่อสนาม (ภาษาอังกฤษ)
-    `photo_url` VARCHAR(255)            -- URL รูปภาพสนาม
-    -- สามารถเพิ่มคอลัมน์อื่นๆ ที่เกี่ยวกับสนามได้ที่นี่ เช่น `capacity` INT, `city` VARCHAR(255)
+    `stadium_ref_id` INT UNIQUE,
+    `team_id` INT,
+    `name` VARCHAR(255) NOT NULL,
+    `name_en` VARCHAR(255),
+    `short_name` VARCHAR(255),
+    `short_name_en` VARCHAR(255),
+    `year_established` INT,
+    `country_name` VARCHAR(255),
+    `country_code` VARCHAR(10),
+    `capacity` INT,
+    `latitude` DOUBLE,
+    `longitude` DOUBLE,
+    `photo_url` VARCHAR(255),
+    FOREIGN KEY (`team_id`) REFERENCES `teams`(`id`)
 );
 
 -- 3. สร้างตาราง teams (ทีม)

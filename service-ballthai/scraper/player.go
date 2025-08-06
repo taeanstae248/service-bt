@@ -4,28 +4,27 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	// "path/filepath" // Not directly used in this file
 
-	"go-ballthai-scraper/database" // Ensure this module name matches your go.mod
-	"go-ballthai-scraper/models"  // Ensure this module name matches your go.mod
+	"go-ballthai-scraper/database" // ตรวจสอบให้แน่ใจว่าชื่อโมดูลตรงกับ go.mod ของคุณ
+	"go-ballthai-scraper/models"  // ตรวจสอบให้แน่ใจว่าชื่อโมดูลตรงกับ go.mod ของคุณ
 )
 
-// ScrapePlayers scrapes player data from the API and saves it to the database
-// This function combines logic from Scrape_R*_Player and Player_Public PHP functions
+// ScrapePlayers ดึงข้อมูลผู้เล่นจาก API และบันทึกลงฐานข้อมูล
+// ฟังก์ชันนี้รวมตรรกะจากฟังก์ชัน PHP Scrape_R*_Player และ Player_Public
 func ScrapePlayers(db *sql.DB) error {
 	baseAPIURL := "https://competition.tl.prod.c0d1um.io/thaileague/api/player-public/all_players_search/"
 
-	// Define specific tournaments/team IDs as seen in PHP files
-	// This is a simplified example, you might need to map tournaments to leagues
-	// and handle specific team IDs as in PHP's hardcoded logic.
+	// กำหนดการกำหนดค่าทัวร์นาเมนต์/Team ID เฉพาะตามที่เห็นในไฟล์ PHP
+	// นี่เป็นตัวอย่างที่ง่ายขึ้น คุณอาจต้องแมปทัวร์นาเมนต์กับลีก
+	// และจัดการ Team ID เฉพาะตามตรรกะที่ฮาร์ดโค้ดใน PHP
 	playerConfigs := []struct {
 		TournamentID int
 		TeamIDs      []int
-		LeagueID     int // Corresponds to your DB league ID
+		LeagueID     int // สอดคล้องกับ League ID ใน DB ของคุณ
 	}{
-		{TournamentID: 195, TeamIDs: []int{6025, 6040, 6039, 6038, 6037, 6036, 6035, 6034, 6033, 6032, 6031, 6030, 6029, 6028, 6027, 6026}, LeagueID: 1}, // Example for R1, map to your actual league ID
-		{TournamentID: 196, TeamIDs: []int{6058, 6057, 6056, 6055, 6054, 6053, 6052, 6051, 6050, 6049, 6048, 6047, 6046, 6045, 6044, 6043, 6042, 6041}, LeagueID: 2}, // Example for R2
-		// Add more configurations as needed, mapping to your DB league IDs
+		{TournamentID: 195, TeamIDs: []int{6025, 6040, 6039, 6038, 6037, 6036, 6035, 6034, 6033, 6032, 6031, 6030, 6029, 6028, 6027, 6026}, LeagueID: 1}, // ตัวอย่างสำหรับ R1, แมปกับ League ID จริงของคุณ
+		{TournamentID: 196, TeamIDs: []int{6058, 6057, 6056, 6055, 6054, 6053, 6052, 6051, 6050, 6049, 6048, 6047, 6046, 6045, 6044, 6043, 6042, 6041}, LeagueID: 2}, // ตัวอย่างสำหรับ R2
+		// เพิ่มการกำหนดค่าเพิ่มเติมตามความจำเป็น, แมปกับ League ID ใน DB ของคุณ
 	}
 
 	for _, config := range playerConfigs {
@@ -43,18 +42,18 @@ func ScrapePlayers(db *sql.DB) error {
 			}
 
 			for _, apiPlayer := range apiResponse.Results {
-				// Download player photo and get only the filename
-				photoFilename := ""
+				// ดาวน์โหลดรูปภาพผู้เล่น
+				photoPath := ""
 				if apiPlayer.Photo != "" {
-					downloadedFilename, err := DownloadImage(apiPlayer.Photo, "./img/player")
+					downloadedPath, err := DownloadImage(apiPlayer.Photo, "./img/player")
 					if err != nil {
 						log.Printf("Warning: Failed to download player photo for %s: %v", apiPlayer.FullName, err)
 					} else {
-						photoFilename = downloadedFilename // Store only the filename
+						photoPath = downloadedPath
 					}
 				}
 
-				// Get Nationality ID
+				// รับ Nationality ID
 				nationalityID := sql.NullInt64{Valid: false}
 				if apiPlayer.Nationality.Code != "" {
 					nID, err := database.GetNationalityID(db, apiPlayer.Nationality.Code, apiPlayer.Nationality.FullName)
@@ -65,38 +64,37 @@ func ScrapePlayers(db *sql.DB) error {
 					}
 				}
 
-				// Get Team ID (from club_name)
+				// รับ Team ID (จาก club_name)
 				playerTeamID := sql.NullInt64{Valid: false}
 				if apiPlayer.ClubName != "" {
-					// Pass empty logo for now, as player API might not provide team logo
-					tID, err := database.GetTeamIDByThaiName(db, apiPlayer.ClubName, "") 
+					tID, err := database.GetTeamIDByThaiName(db, apiPlayer.ClubName, "") // สมมติว่าโลโก้ไม่พร้อมใช้งานที่นี่
 					if err != nil {
 						log.Printf("Warning: Failed to get team ID for player %s's club %s: %v", apiPlayer.FullName, apiPlayer.ClubName, err)
 					} else {
 						playerTeamID = sql.NullInt64{Int64: int64(tID), Valid: true}
 					}
 				}
-				// Handle specific team ID overrides as seen in PHP (if necessary)
-				// e.g., if apiPlayer.ClubName == "นครศรี ยูไนเต็ด" { playerTeamID = sql.NullInt64{Int64: 923, Valid: true} }
+				// จัดการการแทนที่ Team ID เฉพาะตามที่เห็นใน PHP (ถ้าจำเป็น)
+				// เช่น if apiPlayer.ClubName == "นครศรี ยูไนเต็ด" { playerTeamID = sql.NullInt64{Int64: 923, Valid: true} }
 
-				// Prepare PlayerDB struct
+				// เตรียมโครงสร้าง PlayerDB
 				playerDB := models.PlayerDB{
 					PlayerRefID:   sql.NullInt64{Int64: int64(apiPlayer.ID), Valid: true},
-					LeagueID:      sql.NullInt64{Int64: int64(config.LeagueID), Valid: true}, // Use league ID from config
+					LeagueID:      sql.NullInt64{Int64: int64(config.LeagueID), Valid: true}, // ใช้ League ID จาก config
 					TeamID:        playerTeamID,
 					NationalityID: nationalityID,
 					Name:          apiPlayer.FullName,
 					FullNameEN:    sql.NullString{String: apiPlayer.FullNameEN, Valid: apiPlayer.FullNameEN != ""},
 					ShirtNumber:   apiPlayer.ShirtNumber,
 					Position:      sql.NullString{String: apiPlayer.PositionShortName, Valid: apiPlayer.PositionShortName != ""},
-					PhotoURL:      sql.NullString{String: photoFilename, Valid: photoFilename != ""}, // Store filename
+					PhotoURL:      sql.NullString{String: photoPath, Valid: photoPath != ""},
 					MatchesPlayed: apiPlayer.MatchCount,
 					Goals:         apiPlayer.GoalFor,
 					YellowCards:   apiPlayer.YellowCardAcc,
 					RedCards:      apiPlayer.RedCardViolentConductAcc,
 				}
 
-				// Insert or Update player in DB
+				// แทรกหรืออัปเดตผู้เล่นใน DB
 				err = database.InsertOrUpdatePlayer(db, playerDB)
 				if err != nil {
 					log.Printf("Error saving player %s to DB: %v", apiPlayer.FullName, err)
