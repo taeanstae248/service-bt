@@ -24,8 +24,7 @@ CREATE TABLE IF NOT EXISTS `stadiums` (
     `capacity` INT,
     `latitude` DOUBLE,
     `longitude` DOUBLE,
-    `photo_url` VARCHAR(255),
-    FOREIGN KEY (`team_id`) REFERENCES `teams`(`id`)
+    `photo_url` VARCHAR(255)
 );
 
 -- 3. สร้างตาราง teams (ทีม)
@@ -38,8 +37,7 @@ CREATE TABLE IF NOT EXISTS `teams` (
     `team_post_ballthai` VARCHAR(255),
     `website` VARCHAR(255),
     `shop` VARCHAR(255),
-    `stadium_id` INT, -- Foreign Key อ้างอิงไปยังตาราง stadiums
-    FOREIGN KEY (`stadium_id`) REFERENCES `stadiums`(`id`)
+    `stadium_id` INT -- Foreign Key จะถูกเพิ่มทีหลัง
 );
 
 -- 4. สร้างตาราง channels (ช่องทีวี)
@@ -140,3 +138,8 @@ CREATE TABLE IF NOT EXISTS `matches` (
     FOREIGN KEY (`channel_id`) REFERENCES `channels`(`id`),
     FOREIGN KEY (`live_channel_id`) REFERENCES `channels`(`id`)
 );
+
+-- 10. เพิ่ม Foreign Keys เพื่อแก้ไขปัญหา Circular Dependency
+ALTER TABLE `stadiums` ADD CONSTRAINT `fk_stadiums_team_id` FOREIGN KEY (`team_id`) REFERENCES `teams`(`id`);
+ALTER TABLE `teams` ADD CONSTRAINT `fk_teams_stadium_id` FOREIGN KEY (`stadium_id`) REFERENCES `stadiums`(`id`);
+
