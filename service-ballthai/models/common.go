@@ -1,5 +1,7 @@
 package models
 
+import "database/sql" // Added for sql.NullString, sql.NullInt64, sql.NullFloat64, sql.NullTime
+
 // NationalityAPI represents the nationality data from the API
 type NationalityAPI struct {
 	Code     string `json:"code"`
@@ -25,7 +27,7 @@ type ClubNameAPI struct {
 	EN string `json:"en"`
 }
 
-// BaseDB represents common fields for database entities
+// BaseDB represents common fields for database entities (optional, not directly used in all DB structs here)
 type BaseDB struct {
 	ID int
 }
