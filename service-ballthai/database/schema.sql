@@ -14,8 +14,7 @@ CREATE TABLE IF NOT EXISTS `stadiums` (
     `id` INT PRIMARY KEY AUTO_INCREMENT,
     `name` VARCHAR(255) NOT NULL UNIQUE, -- ชื่อสนาม (ภาษาไทย)
     `name_en` VARCHAR(255),             -- ชื่อสนาม (ภาษาอังกฤษ)
-    `photo_url` VARCHAR(255),            -- URL รูปภาพสนาม
-    `stadium_ref_id` INT UNIQUE          -- ID อ้างอิงจาก API
+    `photo_url` VARCHAR(255)            -- URL รูปภาพสนาม
     -- สามารถเพิ่มคอลัมน์อื่นๆ ที่เกี่ยวกับสนามได้ที่นี่ เช่น `capacity` INT, `city` VARCHAR(255)
 );
 
@@ -30,7 +29,6 @@ CREATE TABLE IF NOT EXISTS `teams` (
     `website` VARCHAR(255),
     `shop` VARCHAR(255),
     `stadium_id` INT, -- Foreign Key อ้างอิงไปยังตาราง stadiums
-    `team_ref_id` INT UNIQUE, -- ID อ้างอิงจาก API
     FOREIGN KEY (`stadium_id`) REFERENCES `stadiums`(`id`)
 );
 
@@ -83,7 +81,6 @@ CREATE TABLE IF NOT EXISTS `coaches` (
     `birthday` DATE,                     -- วันเกิด
     `team_id` INT,                       -- Foreign Key อ้างอิงไปยังตาราง teams
     `nationality_id` INT,                -- Foreign Key อ้างอิงไปยังตาราง nationalities
-    `photo_url` VARCHAR(255),            -- URL รูปภาพโค้ช
     FOREIGN KEY (`team_id`) REFERENCES `teams`(`id`),
     FOREIGN KEY (`nationality_id`) REFERENCES `nationalities`(`id`)
 );
@@ -95,6 +92,7 @@ CREATE TABLE IF NOT EXISTS `league_standings` (
     `league_id` INT NOT NULL,           -- Foreign Key อ้างอิงไปยังตาราง leagues
     `team_id` INT NOT NULL,             -- Foreign Key อ้างอิงไปยังตาราง teams
     `round` INT,                        -- รอบการแข่งขัน (ถ้ามี)
+    `stage_name` VARCHAR(255),          -- เพิ่ม: ชื่อโซน/สเตจย่อย (เช่น SOUTH, NORTH)
     `matches_played` INT DEFAULT 0,     -- จำนวนนัดที่ลงแข่ง
     `wins` INT DEFAULT 0,               -- จำนวนนัดที่ชนะ
     `draws` INT DEFAULT 0,              -- จำนวนนัดที่เสมอ
@@ -104,7 +102,7 @@ CREATE TABLE IF NOT EXISTS `league_standings` (
     `goal_difference` INT DEFAULT 0,    -- ผลต่างประตูได้เสีย
     `points` INT DEFAULT 0,             -- คะแนนรวม
     `current_rank` INT,                 -- อันดับปัจจุบัน
-    UNIQUE (`league_id`, `team_id`),    -- กำหนดให้แต่ละทีมมีข้อมูลคะแนนเดียวในแต่ละลีก
+    UNIQUE (`league_id`, `team_id`, `stage_name`), -- กำหนดให้แต่ละทีมมีข้อมูลคะแนนเดียวในแต่ละลีกและสเตจ
     FOREIGN KEY (`league_id`) REFERENCES `leagues`(`id`),
     FOREIGN KEY (`team_id`) REFERENCES `teams`(`id`)
 );
@@ -118,13 +116,14 @@ CREATE TABLE IF NOT EXISTS `matches` (
     `start_date` DATE NOT NULL,
     `start_time` TIME NOT NULL,
     `league_id` INT,                    -- Foreign Key อ้างอิงไปยังตาราง leagues
+    `stage_name` VARCHAR(255),          -- เพิ่ม: ชื่อโซน/สเตจย่อย (เช่น SOUTH, NORTH)
     `home_team_id` INT,                 -- Foreign Key อ้างอิงไปยังตาราง teams (ทีมเหย้า)
     `away_team_id` INT,                 -- Foreign Key อ้างอิงไปยังตาราง teams (ทีมเยือน)
     `channel_id` INT,                   -- Foreign Key อ้างอิงไปยังตาราง channels (ช่องทีวีหลัก)
     `live_channel_id` INT,              -- Foreign Key อ้างอิงไปยังตาราง channels (ช่องถ่ายทอดสด)
     `home_score` INT,                   -- คะแนนทีมเหย้า
     `away_score` INT,                   -- คะแนนทีมเยือน
-    `match_status` VARCHAR(50),         -- สถานะการแข่งขัน (เช่น 'FINISHED', 'FIXTURE')
+    `match_status` VARCHAR(50),         -- สถานะการแข่งขัน (เช่น FIXTURE, FINISHED)
     FOREIGN KEY (`league_id`) REFERENCES `leagues`(`id`),
     FOREIGN KEY (`home_team_id`) REFERENCES `teams`(`id`),
     FOREIGN KEY (`away_team_id`) REFERENCES `teams`(`id`),
