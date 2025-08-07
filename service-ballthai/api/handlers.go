@@ -3,6 +3,7 @@ package api
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -36,11 +37,13 @@ func (h *Handler) SetupRoutes() *http.ServeMux {
 	mux.HandleFunc("/api/teams", h.GetTeams)
 	mux.HandleFunc("/api/stadiums", h.GetStadiums)
 	mux.HandleFunc("/api/matches", h.GetMatches)
+	mux.HandleFunc("/api/players", h.GetPlayers)                              // Handle players listing
 	mux.HandleFunc("/api/teams/", h.GetTeamByID)                              // Handle /api/teams/{id}
 	mux.HandleFunc("/api/team-matches/", h.GetTeamMatches)                    // Handle /api/team-matches/{id}
 	mux.HandleFunc("/api/team-matches-post/", h.GetTeamMatchesByPost)         // Handle /api/team-matches-post/{team_post_ballthai}
 	mux.HandleFunc("/api/standings", h.GetStandings)                          // Handle standings with league filtering
 	mux.HandleFunc("/api/scrape/jleague-standings", h.ScrapeJLeagueStandings) // Handle J-League standings scraping
+	mux.HandleFunc("/api/scrape/players", h.ScrapePlayers)                    // Handle Thai League players scraping
 
 	// Static file serving for images
 	mux.Handle("/images/", http.StripPrefix("/images/", http.FileServer(http.Dir("./img/"))))
@@ -200,6 +203,117 @@ func (h *Handler) GetStadiums(w http.ResponseWriter, r *http.Request) {
 	response := Response{
 		Success: true,
 		Data:    stadiums,
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
+// GetPlayers returns all players with optional filtering
+func (h *Handler) GetPlayers(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Get query parameters for filtering
+	teamID := r.URL.Query().Get("team_id")
+	leagueID := r.URL.Query().Get("league_id")
+	position := r.URL.Query().Get("position")
+	limit := r.URL.Query().Get("limit")
+	if limit == "" {
+		limit = "50" // Default limit
+	}
+
+	type Player struct {
+		ID            int     `json:"id"`
+		PlayerRefID   *int    `json:"player_ref_id"`
+		LeagueID      *int    `json:"league_id"`
+		TeamID        *int    `json:"team_id"`
+		NationalityID *int    `json:"nationality_id"`
+		Name          string  `json:"name"`
+		FullNameEN    *string `json:"full_name_en"`
+		ShirtNumber   *int    `json:"shirt_number"`
+		Position      *string `json:"position"`
+		PhotoURL      *string `json:"photo_url"`
+		MatchesPlayed int     `json:"matches_played"`
+		Goals         int     `json:"goals"`
+		YellowCards   int     `json:"yellow_cards"`
+		RedCards      int     `json:"red_cards"`
+		TeamName      *string `json:"team_name"`
+		LeagueName    *string `json:"league_name"`
+		Nationality   *string `json:"nationality"`
+	}
+
+	// Base query
+	query := `
+		SELECT p.id, p.player_ref_id, p.league_id, p.team_id, p.nationality_id,
+		       p.name, p.full_name_en, p.shirt_number, p.position, p.photo_url,
+		       p.matches_played, p.goals, p.yellow_cards, p.red_cards,
+		       t.name_th as team_name, l.name as league_name, n.name as nationality
+		FROM players p
+		LEFT JOIN teams t ON p.team_id = t.id
+		LEFT JOIN leagues l ON p.league_id = l.id
+		LEFT JOIN nationalities n ON p.nationality_id = n.id
+		WHERE 1=1
+	`
+
+	args := []interface{}{}
+
+	// Add filters
+	if teamID != "" {
+		query += " AND p.team_id = ?"
+		args = append(args, teamID)
+	}
+
+	if leagueID != "" {
+		query += " AND p.league_id = ?"
+		args = append(args, leagueID)
+	}
+
+	if position != "" {
+		query += " AND p.position = ?"
+		args = append(args, position)
+	}
+
+	query += " ORDER BY p.name LIMIT ?"
+	args = append(args, limit)
+
+	rows, err := h.DB.Query(query, args...)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var players []Player
+	for rows.Next() {
+		var player Player
+		err := rows.Scan(
+			&player.ID,
+			&player.PlayerRefID,
+			&player.LeagueID,
+			&player.TeamID,
+			&player.NationalityID,
+			&player.Name,
+			&player.FullNameEN,
+			&player.ShirtNumber,
+			&player.Position,
+			&player.PhotoURL,
+			&player.MatchesPlayed,
+			&player.Goals,
+			&player.YellowCards,
+			&player.RedCards,
+			&player.TeamName,
+			&player.LeagueName,
+			&player.Nationality,
+		)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		players = append(players, player)
+	}
+
+	response := Response{
+		Success: true,
+		Data:    players,
 	}
 
 	json.NewEncoder(w).Encode(response)
@@ -929,6 +1043,62 @@ func (h *Handler) ScrapeJLeagueStandings(w http.ResponseWriter, r *http.Request)
 	response := Response{
 		Success: true,
 		Message: "J-League standings scraped and saved successfully",
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
+// ScrapePlayers handles Thai League players scraping
+func (h *Handler) ScrapePlayers(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method != "POST" {
+		response := Response{
+			Success: false,
+			Message: "Method not allowed. Use POST to trigger scraping.",
+		}
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	// Get tournament ID from query parameter (default to Thai League 1)
+	tournamentIDStr := r.URL.Query().Get("tournament")
+	tournamentID := 195 // Default to Thai League 1
+	if tournamentIDStr != "" {
+		if tournamentIDStr == "196" {
+			tournamentID = 196 // Thai League 2
+		}
+	}
+
+	// Run the players scraper
+	err := scraper.ScrapePlayers(h.DB, tournamentID)
+	if err != nil {
+		response := Response{
+			Success: false,
+			Message: "Failed to scrape players: " + err.Error(),
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	leagueName := "Thai League 1"
+	if tournamentID == 196 {
+		leagueName = "Thai League 2"
+	}
+
+	response := Response{
+		Success: true,
+		Message: fmt.Sprintf("%s players scraped and saved successfully", leagueName),
 	}
 
 	json.NewEncoder(w).Encode(response)
