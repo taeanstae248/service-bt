@@ -1,6 +1,7 @@
 package database
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -133,11 +134,17 @@ func UpdateLastLogin(userID int) error {
 
 // CreateSession สร้าง session ใหม่
 func CreateSession(sessionID string, userID int, expiresAt time.Time) error {
+	if DB == nil {
+		return fmt.Errorf("database connection is nil")
+	}
+
 	query := `
 		INSERT INTO sessions (id, user_id, expires_at)
 		VALUES (?, ?, ?)
 	`
-	_, err := DB.Exec(query, sessionID, userID, expiresAt)
+	// Use local timezone for MySQL
+	localTime := expiresAt.Local()
+	_, err := DB.Exec(query, sessionID, userID, localTime)
 	return err
 }
 
@@ -146,7 +153,7 @@ func GetSession(sessionID string) (*Session, error) {
 	query := `
 		SELECT id, user_id, expires_at, created_at
 		FROM sessions 
-		WHERE id = ? AND expires_at > NOW()
+		WHERE id = ?
 	`
 
 	var session Session
@@ -159,12 +166,25 @@ func GetSession(sessionID string) (*Session, error) {
 		return nil, err
 	}
 
-	// Parse timestamps
-	if expiresAtTime, err := time.Parse("2006-01-02 15:04:05", expiresAtStr); err == nil {
-		session.ExpiresAt = expiresAtTime
+	// Parse timestamps - support multiple formats
+	timeFormats := []string{
+		"2006-01-02T15:04:05Z07:00", // ISO 8601 with timezone
+		"2006-01-02 15:04:05",       // MySQL datetime
+		time.RFC3339,                // RFC3339 format
 	}
-	if createdAtTime, err := time.Parse("2006-01-02 15:04:05", createdAtStr); err == nil {
-		session.CreatedAt = createdAtTime
+
+	for _, format := range timeFormats {
+		if expiresAtTime, err := time.Parse(format, expiresAtStr); err == nil {
+			session.ExpiresAt = expiresAtTime
+			break
+		}
+	}
+
+	for _, format := range timeFormats {
+		if createdAtTime, err := time.Parse(format, createdAtStr); err == nil {
+			session.CreatedAt = createdAtTime
+			break
+		}
 	}
 
 	return &session, nil

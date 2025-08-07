@@ -2,14 +2,16 @@ package main
 
 import (
 	"database/sql"
+	"go-ballthai-scraper/api"
 	"log"
 	"net/http"
 	"os"
 
 	_ "github.com/go-sql-driver/mysql" // Driver สำหรับ MySQL
 	"github.com/joho/godotenv"         // สำหรับโหลด .env
-
-	"go-ballthai-scraper/api" // Import แพ็กเกจ api
+	// Import database package
+	// Import handlers package
+	// Import middleware package
 )
 
 var db *sql.DB // ตัวแปร Global สำหรับเก็บ Connection ฐานข้อมูล

@@ -176,7 +176,8 @@ func VerifyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if session is expired
-	if time.Now().After(session.ExpiresAt) {
+	now := time.Now().Local()
+	if now.After(session.ExpiresAt) {
 		database.DeleteSession(sessionID) // Clean up expired session
 		http.Error(w, `{"success": false, "error": "Session expired"}`, http.StatusUnauthorized)
 		return

@@ -72,8 +72,8 @@ async function handleLogin(event) {
         
         if (response.ok && data.success) {
             // Store session info
-            localStorage.setItem('sessionId', data.session_id);
-            localStorage.setItem('user', JSON.stringify(data.user));
+            localStorage.setItem('sessionId', data.data.session_id);
+            localStorage.setItem('user', JSON.stringify(data.data.user));
             
             showSuccess('เข้าสู่ระบบสำเร็จ! กำลังเปลี่ยนหน้า...');
             

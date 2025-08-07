@@ -52,7 +52,12 @@ func main() {
 	// API routes
 	router.HandleFunc("/api/leagues", handlers.GetLeagues).Methods("GET")
 	router.HandleFunc("/api/teams", handlers.GetTeams).Methods("GET")
+	router.HandleFunc("/api/teams/search", handlers.SearchTeams).Methods("GET")
+	router.HandleFunc("/api/teams", handlers.CreateTeam).Methods("POST")
 	router.HandleFunc("/api/teams/{id}", handlers.GetTeamByID).Methods("GET")
+	router.HandleFunc("/api/teams/{id}", handlers.UpdateTeam).Methods("PUT")
+	router.HandleFunc("/api/teams/{id}", handlers.DeleteTeam).Methods("DELETE")
+	router.HandleFunc("/api/teams/{id}/logo", handlers.UploadTeamLogo).Methods("POST")
 	router.HandleFunc("/api/stadiums", handlers.GetStadiums).Methods("GET")
 	router.HandleFunc("/api/matches", handlers.GetMatches).Methods("GET")
 
@@ -63,6 +68,7 @@ func main() {
 
 	// Static files
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static/"))))
+	router.PathPrefix("/img/").Handler(http.StripPrefix("/img/", http.FileServer(http.Dir("./img/"))))
 
 	// Serve HTML templates
 	router.HandleFunc("/login.html", func(w http.ResponseWriter, r *http.Request) {
@@ -71,6 +77,10 @@ func main() {
 
 	router.HandleFunc("/dashboard.html", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./templates/dashboard.html")
+	})
+
+	router.HandleFunc("/teams.html", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./templates/teams.html")
 	})
 
 	// Redirect root to login
