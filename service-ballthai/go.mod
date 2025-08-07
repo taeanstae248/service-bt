@@ -15,7 +15,8 @@ require (
 	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/rs/cors v1.11.1 // indirect
-	golang.org/x/net v0.39.0 // indirect
+	golang.org/x/crypto v0.40.0 // indirect
+	golang.org/x/net v0.41.0 // indirect
 )
 
 // สามารถเพิ่ม require อื่นๆ ได้ในอนาคต หากใช้ไลบรารีเพิ่มเติม

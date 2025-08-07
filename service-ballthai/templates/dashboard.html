@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - BallThai</title>
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div class="logo">⚽ BallThai Dashboard</div>
+            <div class="user-info">
+                <span id="userWelcome">ยินดีต้อนรับ</span>
+                <button class="logout-btn" onclick="logout()">ออกจากระบบ</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div id="errorMessage" class="error" style="display: none;"></div>
+        
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+                <div class="stat-number" id="totalLeagues">-</div>
+                <div class="stat-label">ลีก</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalTeams">-</div>
+                <div class="stat-label">ทีม</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalPlayers">-</div>
+                <div class="stat-label">ผู้เล่น</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalMatches">-</div>
+                <div class="stat-label">แมทช์</div>
+            </div>
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon">📊</div>
+                    <div class="card-title">สถิติระบบ</div>
+                </div>
+                <div class="card-content">
+                    <p>ระบบ BallThai มีข้อมูลฟุตบอลไทยครบถ้วน รวมถึงข้อมูลผู้เล่น ทีม และแมทช์การแข่งขัน</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon">🔧</div>
+                    <div class="card-title">จัดการข้อมูล</div>
+                </div>
+                <div class="card-content">
+                    <p>คุณสามารถจัดการข้อมูลผู้เล่น ทีม และข้อมูลการแข่งขันผ่าน API ที่มีให้</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon">⚽</div>
+                    <div class="card-title">ข้อมูลผู้เล่น</div>
+                </div>
+                <div class="card-content">
+                    <p>ข้อมูลผู้เล่นครบถ้วนพร้อมสถิติการเล่น สามารถค้นหาตามทีมหรือลีกได้</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="api-endpoints">
+            <h2 style="margin-bottom: 1rem; color: #333;">🌐 API Endpoints</h2>
+            <div class="endpoint-item">
+                <span class="endpoint-method">GET</span>
+                <span class="endpoint-url">/api/leagues</span>
+                <button class="test-btn" onclick="testAPI('/api/leagues')">ทดสอบ</button>
+            </div>
+            <div class="endpoint-item">
+                <span class="endpoint-method">GET</span>
+                <span class="endpoint-url">/api/teams</span>
+                <button class="test-btn" onclick="testAPI('/api/teams')">ทดสอบ</button>
+            </div>
+            <div class="endpoint-item">
+                <span class="endpoint-method">GET</span>
+                <span class="endpoint-url">/api/players</span>
+                <button class="test-btn" onclick="testAPI('/api/players')">ทดสอบ</button>
+            </div>
+            <div class="endpoint-item">
+                <span class="endpoint-method">GET</span>
+                <span class="endpoint-url">/api/matches</span>
+                <button class="test-btn" onclick="testAPI('/api/matches')">ทดสอบ</button>
+            </div>
+            <div class="endpoint-item">
+                <span class="endpoint-method">GET</span>
+                <span class="endpoint-url">/api/stadiums</span>
+                <button class="test-btn" onclick="testAPI('/api/stadiums')">ทดสอบ</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/dashboard.js"></script>
+</body>
+</html>
