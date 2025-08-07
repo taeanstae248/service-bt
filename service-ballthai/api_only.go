@@ -62,6 +62,26 @@ type Match struct {
 	StadiumName *string `json:"stadium_name"`
 }
 
+type Player struct {
+	ID            int     `json:"id"`
+	PlayerRefID   *int    `json:"player_ref_id,omitempty"`
+	LeagueID      *int    `json:"league_id,omitempty"`
+	TeamID        *int    `json:"team_id,omitempty"`
+	NationalityID *int    `json:"nationality_id,omitempty"`
+	Name          string  `json:"name"`
+	FullNameEN    *string `json:"full_name_en,omitempty"`
+	ShirtNumber   *int    `json:"shirt_number,omitempty"`
+	Position      *string `json:"position,omitempty"`
+	PhotoURL      *string `json:"photo_url,omitempty"`
+	MatchesPlayed int     `json:"matches_played"`
+	Goals         int     `json:"goals"`
+	YellowCards   int     `json:"yellow_cards"`
+	RedCards      int     `json:"red_cards"`
+	TeamName      *string `json:"team_name,omitempty"`
+	LeagueName    *string `json:"league_name,omitempty"`
+	Nationality   *string `json:"nationality,omitempty"`
+}
+
 func main() {
 	// Load environment variables
 	log.Printf("Attempting to load .env file...")
@@ -113,6 +133,9 @@ func startAPIServer() {
 	router.HandleFunc("/api/teams/{id}", getTeamByID).Methods("GET")
 	router.HandleFunc("/api/stadiums", getStadiums).Methods("GET")
 	router.HandleFunc("/api/matches", getMatches).Methods("GET")
+	router.HandleFunc("/api/players", getPlayers).Methods("GET")
+	router.HandleFunc("/api/players/team/{id}", getPlayersByTeamID).Methods("GET")
+	router.HandleFunc("/api/players/team-post/{post_id}", getPlayersByTeamPost).Methods("GET")
 
 	// Static file serving for images
 	router.PathPrefix("/images/").Handler(http.StripPrefix("/images/", http.FileServer(http.Dir("./img/"))))
@@ -128,6 +151,9 @@ func startAPIServer() {
 	log.Println("  GET /api/teams/{id} - Get team by ID")
 	log.Println("  GET /api/stadiums - Get all stadiums")
 	log.Println("  GET /api/matches?league_id={id}&limit={limit} - Get matches")
+	log.Println("  GET /api/players?team_id={id}&league_id={id}&position={pos}&limit={limit} - Get players")
+	log.Println("  GET /api/players/team/{id} - Get players by team ID")
+	log.Println("  GET /api/players/team-post/{post_id} - Get players by team_post_ballthai")
 	log.Println("  GET /images/{path} - Serve static images")
 
 	log.Fatal(http.ListenAndServe(":8080", handler))
@@ -332,6 +358,217 @@ func getMatches(w http.ResponseWriter, r *http.Request) {
 	response := APIResponse{
 		Success: true,
 		Data:    matches,
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
+func getPlayers(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Parse query parameters
+	teamIDStr := r.URL.Query().Get("team_id")
+	leagueIDStr := r.URL.Query().Get("league_id")
+	position := r.URL.Query().Get("position")
+	limitStr := r.URL.Query().Get("limit")
+
+	var args []interface{}
+	query := `
+		SELECT p.id, p.player_ref_id, p.league_id, p.team_id, p.nationality_id,
+		       p.name, p.full_name_en, p.shirt_number, p.position, p.photo_url,
+		       p.matches_played, p.goals, p.yellow_cards, p.red_cards,
+		       t.name_th as team_name, l.name as league_name, n.name as nationality
+		FROM players p
+		LEFT JOIN teams t ON p.team_id = t.id
+		LEFT JOIN leagues l ON p.league_id = l.id
+		LEFT JOIN nationalities n ON p.nationality_id = n.id
+		WHERE 1=1
+	`
+
+	// Add filters
+	if teamIDStr != "" {
+		teamID, err := strconv.Atoi(teamIDStr)
+		if err != nil {
+			http.Error(w, "Invalid team_id parameter", http.StatusBadRequest)
+			return
+		}
+		query += " AND p.team_id = ?"
+		args = append(args, teamID)
+	}
+
+	if leagueIDStr != "" {
+		leagueID, err := strconv.Atoi(leagueIDStr)
+		if err != nil {
+			http.Error(w, "Invalid league_id parameter", http.StatusBadRequest)
+			return
+		}
+		query += " AND p.league_id = ?"
+		args = append(args, leagueID)
+	}
+
+	if position != "" {
+		query += " AND p.position = ?"
+		args = append(args, position)
+	}
+
+	query += " ORDER BY p.name"
+
+	// Add limit
+	if limitStr != "" {
+		limit, err := strconv.Atoi(limitStr)
+		if err != nil {
+			http.Error(w, "Invalid limit parameter", http.StatusBadRequest)
+			return
+		}
+		query += " LIMIT ?"
+		args = append(args, limit)
+	} else {
+		query += " LIMIT 50" // default limit
+	}
+
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var players []Player
+	for rows.Next() {
+		var player Player
+		if err := rows.Scan(
+			&player.ID, &player.PlayerRefID, &player.LeagueID, &player.TeamID, &player.NationalityID,
+			&player.Name, &player.FullNameEN, &player.ShirtNumber, &player.Position, &player.PhotoURL,
+			&player.MatchesPlayed, &player.Goals, &player.YellowCards, &player.RedCards,
+			&player.TeamName, &player.LeagueName, &player.Nationality,
+		); err != nil {
+			http.Error(w, fmt.Sprintf("Scan error: %v", err), http.StatusInternalServerError)
+			return
+		}
+		players = append(players, player)
+	}
+
+	response := APIResponse{
+		Success: true,
+		Data:    players,
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
+func getPlayersByTeamID(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	vars := mux.Vars(r)
+	teamID, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		http.Error(w, "Invalid team ID", http.StatusBadRequest)
+		return
+	}
+
+	query := `
+		SELECT p.id, p.player_ref_id, p.league_id, p.team_id, p.nationality_id,
+		       p.name, p.full_name_en, p.shirt_number, p.position, p.photo_url,
+		       p.matches_played, p.goals, p.yellow_cards, p.red_cards,
+		       t.name_th as team_name, l.name as league_name, n.name as nationality
+		FROM players p
+		LEFT JOIN teams t ON p.team_id = t.id
+		LEFT JOIN leagues l ON p.league_id = l.id
+		LEFT JOIN nationalities n ON p.nationality_id = n.id
+		WHERE p.team_id = ?
+		ORDER BY p.shirt_number, p.name
+	`
+
+	rows, err := db.Query(query, teamID)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var players []Player
+	for rows.Next() {
+		var player Player
+		if err := rows.Scan(
+			&player.ID, &player.PlayerRefID, &player.LeagueID, &player.TeamID, &player.NationalityID,
+			&player.Name, &player.FullNameEN, &player.ShirtNumber, &player.Position, &player.PhotoURL,
+			&player.MatchesPlayed, &player.Goals, &player.YellowCards, &player.RedCards,
+			&player.TeamName, &player.LeagueName, &player.Nationality,
+		); err != nil {
+			http.Error(w, fmt.Sprintf("Scan error: %v", err), http.StatusInternalServerError)
+			return
+		}
+		players = append(players, player)
+	}
+
+	response := APIResponse{
+		Success: true,
+		Data:    players,
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
+func getPlayersByTeamPost(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	vars := mux.Vars(r)
+	teamPost := vars["post_id"]
+	if teamPost == "" {
+		http.Error(w, "Invalid team post ID", http.StatusBadRequest)
+		return
+	}
+
+	// First, get team ID from team_post_ballthai
+	var teamID int
+	teamQuery := `SELECT id FROM teams WHERE team_post_ballthai = ?`
+	err := db.QueryRow(teamQuery, teamPost).Scan(&teamID)
+	if err == sql.ErrNoRows {
+		http.Error(w, "Team not found with the provided team_post_ballthai", http.StatusNotFound)
+		return
+	} else if err != nil {
+		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	query := `
+		SELECT p.id, p.player_ref_id, p.league_id, p.team_id, p.nationality_id,
+		       p.name, p.full_name_en, p.shirt_number, p.position, p.photo_url,
+		       p.matches_played, p.goals, p.yellow_cards, p.red_cards,
+		       t.name_th as team_name, l.name as league_name, n.name as nationality
+		FROM players p
+		LEFT JOIN teams t ON p.team_id = t.id
+		LEFT JOIN leagues l ON p.league_id = l.id
+		LEFT JOIN nationalities n ON p.nationality_id = n.id
+		WHERE p.team_id = ?
+		ORDER BY p.shirt_number, p.name
+	`
+
+	rows, err := db.Query(query, teamID)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var players []Player
+	for rows.Next() {
+		var player Player
+		if err := rows.Scan(
+			&player.ID, &player.PlayerRefID, &player.LeagueID, &player.TeamID, &player.NationalityID,
+			&player.Name, &player.FullNameEN, &player.ShirtNumber, &player.Position, &player.PhotoURL,
+			&player.MatchesPlayed, &player.Goals, &player.YellowCards, &player.RedCards,
+			&player.TeamName, &player.LeagueName, &player.Nationality,
+		); err != nil {
+			http.Error(w, fmt.Sprintf("Scan error: %v", err), http.StatusInternalServerError)
+			return
+		}
+		players = append(players, player)
+	}
+
+	response := APIResponse{
+		Success: true,
+		Data:    players,
 	}
 
 	json.NewEncoder(w).Encode(response)
