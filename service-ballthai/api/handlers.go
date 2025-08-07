@@ -37,6 +37,7 @@ func (h *Handler) SetupRoutes() *http.ServeMux {
 	mux.HandleFunc("/api/teams/", h.GetTeamByID)                      // Handle /api/teams/{id}
 	mux.HandleFunc("/api/team-matches/", h.GetTeamMatches)            // Handle /api/team-matches/{id}
 	mux.HandleFunc("/api/team-matches-post/", h.GetTeamMatchesByPost) // Handle /api/team-matches-post/{team_post_ballthai}
+	mux.HandleFunc("/api/standings", h.GetStandings)                  // Handle standings with league filtering
 
 	// Static file serving for images
 	mux.Handle("/images/", http.StripPrefix("/images/", http.FileServer(http.Dir("./img/"))))
@@ -765,6 +766,124 @@ func (h *Handler) GetTeamMatchesByPost(w http.ResponseWriter, r *http.Request) {
 			Upcoming: upcomingMatches,
 			Past:     pastMatches,
 		},
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
+// GetStandings returns league standings with optional league filtering
+func (h *Handler) GetStandings(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get league filter from query parameter
+	leagueFilter := r.URL.Query().Get("league")
+
+	type Standing struct {
+		ID             int     `json:"id"`
+		LeagueID       int     `json:"league_id"`
+		TeamID         int     `json:"team_id"`
+		Position       int     `json:"position"`
+		MatchesPlayed  int     `json:"matches_played"`
+		Wins           int     `json:"wins"`
+		Draws          int     `json:"draws"`
+		Losses         int     `json:"losses"`
+		GoalsFor       int     `json:"goals_for"`
+		GoalsAgainst   int     `json:"goals_against"`
+		GoalDifference int     `json:"goal_difference"`
+		Points         int     `json:"points"`
+		TeamName       string  `json:"team_name"`
+		TeamLogo       *string `json:"team_logo"`
+		LeagueName     string  `json:"league_name"`
+	}
+
+	// Base query
+	query := `
+		SELECT s.id, s.league_id, s.team_id, s.current_rank as position,
+		       s.matches_played, s.wins, s.draws, s.losses, s.goals_for,
+		       s.goals_against, s.goal_difference, s.points,
+		       t.name_th as team_name, t.logo_url as team_logo, l.name as league_name
+		FROM standings s
+		LEFT JOIN teams t ON s.team_id = t.id
+		LEFT JOIN leagues l ON s.league_id = l.id
+	`
+
+	args := []interface{}{}
+
+	// Add league filter if specified
+	if leagueFilter != "" {
+		// Map short codes to league IDs
+		leagueMap := map[string]string{
+			"t1": "1", // Thai League 1
+			"t2": "2", // Thai League 2
+			"t3": "3", // Thai League 3
+			"fa": "4", // FA Cup
+			"lc": "5", // League Cup
+		}
+
+		if mappedLeague, exists := leagueMap[leagueFilter]; exists {
+			query += " WHERE s.league_id = ?"
+			args = append(args, mappedLeague)
+		}
+	}
+
+	query += " ORDER BY s.league_id, s.current_rank ASC"
+
+	rows, err := h.DB.Query(query, args...)
+	if err != nil {
+		http.Error(w, "Database error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var standings []Standing
+
+	for rows.Next() {
+		var standing Standing
+		err := rows.Scan(
+			&standing.ID,
+			&standing.LeagueID,
+			&standing.TeamID,
+			&standing.Position,
+			&standing.MatchesPlayed,
+			&standing.Wins,
+			&standing.Draws,
+			&standing.Losses,
+			&standing.GoalsFor,
+			&standing.GoalsAgainst,
+			&standing.GoalDifference,
+			&standing.Points,
+			&standing.TeamName,
+			&standing.TeamLogo,
+			&standing.LeagueName,
+		)
+		if err != nil {
+			http.Error(w, "Scan error: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		standings = append(standings, standing)
+	}
+
+	if err = rows.Err(); err != nil {
+		http.Error(w, "Rows error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	response := Response{
+		Success: true,
+		Data:    standings,
 	}
 
 	json.NewEncoder(w).Encode(response)

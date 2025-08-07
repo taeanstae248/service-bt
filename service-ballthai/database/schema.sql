@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS `coaches` (
 
 -- 8. สร้างตาราง league_standings (ตารางคะแนนลีก)
 -- ตารางนี้เก็บข้อมูลตารางคะแนน/อันดับของแต่ละทีมในแต่ละลีก
-CREATE TABLE IF NOT EXISTS `league_standings` (
+CREATE TABLE IF NOT EXISTS `standings` (
     `id` INT PRIMARY KEY AUTO_INCREMENT,
     `league_id` INT NOT NULL,           -- Foreign Key อ้างอิงไปยังตาราง leagues
     `team_id` INT NOT NULL,             -- Foreign Key อ้างอิงไปยังตาราง teams

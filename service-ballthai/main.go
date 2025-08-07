@@ -95,6 +95,8 @@ func startAPIServer() {
 	log.Printf("   • GET /api/matches        - Matches (upcoming and past)")
 	log.Printf("   • GET /api/matches?league_id=1 - Matches by league ID")
 	log.Printf("   • GET /api/matches?league=t1 - Matches by league name (t1, t2, t3, fa, lc, youth, cl, afc)")
+	log.Printf("   • GET /api/standings      - League standings")
+	log.Printf("   • GET /api/standings?league=t1 - Standings by league (t1, t2, t3, fa, lc)")
 	log.Printf("   • GET /images/{path}      - Static images")
 	log.Printf("")
 	log.Printf("🌐 API Server running at: http://localhost:%s", port)
