@@ -165,7 +165,24 @@ func startAPIServer() {
 
 	// Static file serving
 	router.PathPrefix("/images/").Handler(http.StripPrefix("/images/", http.FileServer(http.Dir("./img/"))))
-	router.PathPrefix("/").Handler(http.FileServer(http.Dir("./")))
+	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static/"))))
+	
+	// Serve specific HTML files from templates
+	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./templates/login.html")
+	}).Methods("GET")
+	router.HandleFunc("/login.html", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./templates/login.html")
+	}).Methods("GET")
+	router.HandleFunc("/dashboard.html", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./templates/dashboard.html")
+	}).Methods("GET")
+	router.HandleFunc("/teams.html", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./templates/teams.html")
+	}).Methods("GET")
+	router.HandleFunc("/leagues.html", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./templates/leagues.html")
+	}).Methods("GET")
 
 	// Enable CORS
 	c := cors.AllowAll()

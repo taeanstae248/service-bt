@@ -10,12 +10,15 @@ require (
 )
 
 require (
+	github.com/PuerkitoBio/goquery v1.10.3
+	github.com/gorilla/mux v1.8.1
+	github.com/rs/cors v1.11.1
+	golang.org/x/crypto v0.40.0
+)
+
+require (
 	filippo.io/edwards25519 v1.1.0 // indirect
-	github.com/PuerkitoBio/goquery v1.10.3 // indirect
 	github.com/andybalholm/cascadia v1.3.3 // indirect
-	github.com/gorilla/mux v1.8.1 // indirect
-	github.com/rs/cors v1.11.1 // indirect
-	golang.org/x/crypto v0.40.0 // indirect
 	golang.org/x/net v0.41.0 // indirect
 )
 
