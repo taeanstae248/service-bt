@@ -12,13 +12,13 @@ import (
 func InsertOrUpdateStanding(db *sql.DB, standing models.StandingDB) error {
 	var existingStandingID int
 	// Check for existing record based on league_id and team_id (UNIQUE constraint)
-	query := "SELECT id FROM league_standings WHERE league_id = ? AND team_id = ?"
+	query := "SELECT id FROM standings WHERE league_id = ? AND team_id = ?"
 	err := db.QueryRow(query, standing.LeagueID, standing.TeamID).Scan(&existingStandingID)
 
 	if err == sql.ErrNoRows {
 		// Insert new standing
 		insertQuery := `
-			INSERT INTO league_standings (
+			INSERT INTO standings (
 				league_id, team_id, round, matches_played, wins, draws, losses,
 				goals_for, goals_against, goal_difference, points, current_rank
 			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -37,7 +37,7 @@ func InsertOrUpdateStanding(db *sql.DB, standing models.StandingDB) error {
 	} else {
 		// Update existing standing
 		updateQuery := `
-			UPDATE league_standings SET
+			UPDATE standings SET
 				round = ?, matches_played = ?, wins = ?, draws = ?, losses = ?,
 				goals_for = ?, goals_against = ?, goal_difference = ?, points = ?, current_rank = ?
 			WHERE id = ?

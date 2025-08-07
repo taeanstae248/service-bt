@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ball Thai API - J-League Scraper</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .api-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+        
+        .api-section h2 {
+            color: #34495e;
+            margin-top: 0;
+        }
+        
+        .button {
+            background: #3498db;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+            transition: background 0.3s;
+        }
+        
+        .button:hover {
+            background: #2980b9;
+        }
+        
+        .button.scrape {
+            background: #e74c3c;
+        }
+        
+        .button.scrape:hover {
+            background: #c0392b;
+        }
+        
+        .response {
+            margin-top: 20px;
+            padding: 15px;
+            background: #2c3e50;
+            color: #ecf0f1;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .loading {
+            color: #f39c12;
+            font-style: italic;
+        }
+        
+        .success {
+            color: #27ae60;
+        }
+        
+        .error {
+            color: #e74c3c;
+        }
+        
+        .endpoint {
+            background: #34495e;
+            color: #ecf0f1;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            display: inline-block;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏈 Ball Thai API - J-League Scraper</h1>
+        
+        <div class="api-section">
+            <h2>📊 J-League Standings Scraper</h2>
+            <p>ใช้ scraper นี้เพื่อดึงข้อมูลตารางคะแนน J-League จากเว็บ Kapook และบันทึกลงฐานข้อมูล</p>
+            <div class="endpoint">POST /api/scrape/jleague-standings</div>
+            <br><br>
+            <button class="button scrape" onclick="scrapeJLeague()">🔄 Scrape J-League Standings</button>
+            <div id="scrapeResponse" class="response" style="display:none;"></div>
+        </div>
+        
+        <div class="api-section">
+            <h2>📋 View Standings</h2>
+            <p>ดูตารางคะแนนที่บันทึกไว้ในฐานข้อมูล</p>
+            <div class="endpoint">GET /api/standings</div>
+            <br><br>
+            <button class="button" onclick="viewStandings()">👀 View All Standings</button>
+            <button class="button" onclick="viewStandings('?league=t1')">🇹🇭 Thai League 1</button>
+            <button class="button" onclick="viewStandings('?league=t2')">🇹🇭 Thai League 2</button>
+            <div id="standingsResponse" class="response" style="display:none;"></div>
+        </div>
+        
+        <div class="api-section">
+            <h2>🔗 Other API Endpoints</h2>
+            <p>API endpoints อื่นๆ ที่สามารถใช้งานได้</p>
+            <button class="button" onclick="viewData('/api/leagues')">🏆 Leagues</button>
+            <button class="button" onclick="viewData('/api/teams')">⚽ Teams</button>
+            <button class="button" onclick="viewData('/api/stadiums')">🏟️ Stadiums</button>
+            <button class="button" onclick="viewData('/api/matches')">📅 Matches</button>
+            <div id="otherResponse" class="response" style="display:none;"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8081';
+        
+        async function scrapeJLeague() {
+            const responseDiv = document.getElementById('scrapeResponse');
+            responseDiv.style.display = 'block';
+            responseDiv.innerHTML = '<span class="loading">🔄 กำลัง scrape ข้อมูล J-League...</span>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/scrape/jleague-standings`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    responseDiv.innerHTML = `<span class="success">✅ ${data.message}</span>`;
+                } else {
+                    responseDiv.innerHTML = `<span class="error">❌ Error: ${data.message}</span>`;
+                }
+            } catch (error) {
+                responseDiv.innerHTML = `<span class="error">❌ Network Error: ${error.message}</span>`;
+            }
+        }
+        
+        async function viewStandings(query = '') {
+            const responseDiv = document.getElementById('standingsResponse');
+            responseDiv.style.display = 'block';
+            responseDiv.innerHTML = '<span class="loading">📊 กำลังโหลดตารางคะแนน...</span>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/standings${query}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const formatted = JSON.stringify(data, null, 2);
+                    responseDiv.innerHTML = `<span class="success">✅ Success</span>\n${formatted}`;
+                } else {
+                    responseDiv.innerHTML = `<span class="error">❌ Error: ${data.message}</span>`;
+                }
+            } catch (error) {
+                responseDiv.innerHTML = `<span class="error">❌ Network Error: ${error.message}</span>`;
+            }
+        }
+        
+        async function viewData(endpoint) {
+            const responseDiv = document.getElementById('otherResponse');
+            responseDiv.style.display = 'block';
+            responseDiv.innerHTML = '<span class="loading">📡 กำลังโหลดข้อมูล...</span>';
+            
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const formatted = JSON.stringify(data, null, 2);
+                    responseDiv.innerHTML = `<span class="success">✅ Success</span>\n${formatted}`;
+                } else {
+                    responseDiv.innerHTML = `<span class="error">❌ Error: ${data.message}</span>`;
+                }
+            } catch (error) {
+                responseDiv.innerHTML = `<span class="error">❌ Network Error: ${error.message}</span>`;
+            }
+        }
+    </script>
+</body>
+</html>

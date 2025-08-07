@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
+	"go-ballthai-scraper/scraper"
 )
 
 // Response represents a standard API response
@@ -34,10 +36,11 @@ func (h *Handler) SetupRoutes() *http.ServeMux {
 	mux.HandleFunc("/api/teams", h.GetTeams)
 	mux.HandleFunc("/api/stadiums", h.GetStadiums)
 	mux.HandleFunc("/api/matches", h.GetMatches)
-	mux.HandleFunc("/api/teams/", h.GetTeamByID)                      // Handle /api/teams/{id}
-	mux.HandleFunc("/api/team-matches/", h.GetTeamMatches)            // Handle /api/team-matches/{id}
-	mux.HandleFunc("/api/team-matches-post/", h.GetTeamMatchesByPost) // Handle /api/team-matches-post/{team_post_ballthai}
-	mux.HandleFunc("/api/standings", h.GetStandings)                  // Handle standings with league filtering
+	mux.HandleFunc("/api/teams/", h.GetTeamByID)                              // Handle /api/teams/{id}
+	mux.HandleFunc("/api/team-matches/", h.GetTeamMatches)                    // Handle /api/team-matches/{id}
+	mux.HandleFunc("/api/team-matches-post/", h.GetTeamMatchesByPost)         // Handle /api/team-matches-post/{team_post_ballthai}
+	mux.HandleFunc("/api/standings", h.GetStandings)                          // Handle standings with league filtering
+	mux.HandleFunc("/api/scrape/jleague-standings", h.ScrapeJLeagueStandings) // Handle J-League standings scraping
 
 	// Static file serving for images
 	mux.Handle("/images/", http.StripPrefix("/images/", http.FileServer(http.Dir("./img/"))))
@@ -884,6 +887,48 @@ func (h *Handler) GetStandings(w http.ResponseWriter, r *http.Request) {
 	response := Response{
 		Success: true,
 		Data:    standings,
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
+// ScrapeJLeagueStandings handles J-League standings scraping
+func (h *Handler) ScrapeJLeagueStandings(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method != "POST" {
+		response := Response{
+			Success: false,
+			Message: "Method not allowed. Use POST to trigger scraping.",
+		}
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	// Run the J-League standings scraper
+	err := scraper.ScrapeJLeagueStandings(h.DB)
+	if err != nil {
+		response := Response{
+			Success: false,
+			Message: "Failed to scrape J-League standings: " + err.Error(),
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	response := Response{
+		Success: true,
+		Message: "J-League standings scraped and saved successfully",
 	}
 
 	json.NewEncoder(w).Encode(response)
