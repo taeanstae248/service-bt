@@ -54,6 +54,7 @@ async function handleLogin(event) {
     hideMessages();
     
     try {
+        console.log('Attempting login with:', username);
         const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
             method: 'POST',
             headers: {
@@ -65,7 +66,9 @@ async function handleLogin(event) {
             })
         });
         
+        console.log('Response status:', response.status);
         const data = await response.json();
+        console.log('Response data:', data);
         
         if (response.ok && data.success) {
             // Store session info

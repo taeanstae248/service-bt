@@ -3,12 +3,19 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 
 	"golang.org/x/crypto/bcrypt"
 )
 
 func main() {
-	password := "admin123"
+	var password string
+	if len(os.Args) > 1 {
+		password = os.Args[1]
+	} else {
+		password = "admin123"
+	}
+
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		log.Fatal(err)

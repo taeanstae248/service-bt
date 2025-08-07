@@ -11,6 +11,11 @@ import (
 
 var DB *sql.DB // ตัวแปร Global สำหรับเก็บ Connection ฐานข้อมูล
 
+// SetDB sets the database connection
+func SetDB(database *sql.DB) {
+	DB = database
+}
+
 // InitDB initializes the database connection
 func InitDB(connStr string) error {
 	var err error

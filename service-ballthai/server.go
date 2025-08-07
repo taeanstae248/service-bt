@@ -9,6 +9,7 @@ import (
 	"github.com/gorilla/mux"
 
 	"go-ballthai-scraper/config"
+	"go-ballthai-scraper/database"
 	"go-ballthai-scraper/handlers"
 	"go-ballthai-scraper/middleware"
 )
@@ -34,6 +35,7 @@ func main() {
 
 	// Set database connection for handlers
 	handlers.SetDB(db)
+	database.SetDB(db)
 
 	// Create router
 	router := mux.NewRouter()
