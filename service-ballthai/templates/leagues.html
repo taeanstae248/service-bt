@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>จัดการลีก - Ball Thai Service</title>
+    <link rel="stylesheet" href="/static/css/leagues.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <h1 class="nav-title">Ball Thai Service</h1>
+            <div class="nav-links">
+                <a href="/dashboard.html">หน้าหลัก</a>
+                <a href="/teams.html">จัดการทีม</a>
+                <a href="/leagues.html" class="active">จัดการลีก</a>
+                <button onclick="logout()" class="logout-btn">ออกจากระบบ</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="header">
+            <h1>จัดการลีก</h1>
+            <button onclick="openAddModal()" class="btn btn-primary">เพิ่มลีกใหม่</button>
+        </div>
+
+        <div class="controls">
+            <div class="search-container">
+                <input type="text" id="searchInput" placeholder="ค้นหาลีก..." onkeyup="searchLeagues()">
+                <button onclick="searchLeagues()" class="btn btn-secondary">ค้นหา</button>
+            </div>
+        </div>
+
+        <div class="leagues-grid" id="leaguesGrid">
+            <!-- Leagues will be loaded here -->
+        </div>
+    </div>
+
+    <!-- Add/Edit League Modal -->
+    <div id="leagueModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">เพิ่มลีกใหม่</h2>
+                <span class="close" onclick="closeModal()">&times;</span>
+            </div>
+            <form id="leagueForm" onsubmit="saveLeague(event)">
+                <div class="form-group">
+                    <label for="leagueName">ชื่อลีก:</label>
+                    <input type="text" id="leagueName" name="name" required 
+                           placeholder="เช่น Thai League 1, Premier League">
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" onclick="closeModal()" class="btn btn-secondary">ยกเลิก</button>
+                    <button type="submit" class="btn btn-primary">บันทึก</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>ยืนยันการลบ</h2>
+                <span class="close" onclick="closeDeleteModal()">&times;</span>
+            </div>
+            <p>คุณต้องการลบลีก "<span id="deleteLeagueName"></span>" หรือไม่?</p>
+            <div class="form-actions">
+                <button type="button" onclick="closeDeleteModal()" class="btn btn-secondary">ยกเลิก</button>
+                <button type="button" onclick="confirmDelete()" class="btn btn-danger">ลบ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div id="loading" class="loading" style="display: none;">
+        <div class="spinner"></div>
+        <p>กำลังโหลด...</p>
+    </div>
+
+    <!-- Alert Messages -->
+    <div id="alertContainer" class="alert-container"></div>
+
+    <script src="/static/js/leagues.js"></script>
+</body>
+</html>

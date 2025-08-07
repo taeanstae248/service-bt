@@ -26,7 +26,7 @@ func LoadConfig() *Config {
 	config := &Config{
 		DBHost:     getEnv("DB_HOST", "localhost"),
 		DBPort:     getEnv("DB_PORT", "3306"),
-		DBUser:     getEnv("DB_USER", "root"),
+		DBUser:     getEnv("DB_USERNAME", "root"),
 		DBPassword: getEnv("DB_PASSWORD", ""),
 		DBName:     getEnv("DB_NAME", "ballthai_db"),
 		ServerPort: getEnv("SERVER_PORT", "8080"),
