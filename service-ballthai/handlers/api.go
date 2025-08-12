@@ -246,6 +246,31 @@ func GetStadiums(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetMatches returns matches with optional pagination and league filter
+// CreateMatch handles POST /api/matches
+func CreateMatch(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	var req struct {
+		LeagueID    int    `json:"league_id"`
+		StageID     int    `json:"stage_id"`
+		StartDate   string `json:"start_date"`
+		StartTime   string `json:"start_time"`
+		HomeTeamID  int    `json:"home_team_id"`
+		AwayTeamID  int    `json:"away_team_id"`
+		HomeScore   int    `json:"home_score"`
+		AwayScore   int    `json:"away_score"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"success": false, "error": "Invalid request body"}`, http.StatusBadRequest)
+		return
+	}
+	query := `INSERT INTO matches (league_id, stage_id, start_date, start_time, home_team_id, away_team_id, home_score, away_score, match_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'FIXTURE')`
+	_, err := DB.Exec(query, req.LeagueID, req.StageID, req.StartDate, req.StartTime, req.HomeTeamID, req.AwayTeamID, req.HomeScore, req.AwayScore)
+	if err != nil {
+		http.Error(w, `{"success": false, "error": "Failed to save match"}`, http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]interface{}{ "success": true })
+}
 func GetMatches(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 

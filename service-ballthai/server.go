@@ -65,6 +65,7 @@ func main() {
 	router.HandleFunc("/api/teams/{id}/logo", handlers.UploadTeamLogo).Methods("POST")
 	router.HandleFunc("/api/stadiums", handlers.GetStadiums).Methods("GET")
 	router.HandleFunc("/api/matches", handlers.GetMatches).Methods("GET")
+	router.HandleFunc("/api/matches", handlers.CreateMatch).Methods("POST")
 	// เพิ่ม route สำหรับ scraper
 	router.HandleFunc("/scraper/matches", handlers.ScrapeMatchesHandler).Methods("GET")
 
