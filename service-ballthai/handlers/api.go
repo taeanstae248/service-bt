@@ -4,8 +4,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gorilla/mux"
 )
@@ -251,29 +253,30 @@ func GetChannels(w http.ResponseWriter, r *http.Request) {
 func CreateMatch(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var req struct {
-		LeagueID    int     `json:"league_id"`
-		StageID     *int    `json:"stage_id"`
-		StartDate   string  `json:"start_date"`
-		StartTime   string  `json:"start_time"`
-		HomeTeamID  int     `json:"home_team_id"`
-		AwayTeamID  int     `json:"away_team_id"`
-		HomeScore   int     `json:"home_score"`
-		AwayScore   int     `json:"away_score"`
-		MatchRefID  int     `json:"match_ref_id"`
-		MatchStatus string  `json:"match_status"`
+		LeagueID    int    `json:"league_id"`
+		StageID     *int   `json:"stage_id"`
+		StartDate   string `json:"start_date"`
+		StartTime   string `json:"start_time"`
+		HomeTeamID  int    `json:"home_team_id"`
+		AwayTeamID  int    `json:"away_team_id"`
+		HomeScore   int    `json:"home_score"`
+		AwayScore   int    `json:"away_score"`
+		MatchRefID  int    `json:"match_ref_id"`
+		MatchStatus string `json:"match_status"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, `{"success": false, "error": "Invalid request body"}`, http.StatusBadRequest)
 		return
 	}
-	query := `INSERT INTO matches (match_ref_id, league_id, stage_id, start_date, start_time, home_team_id, away_team_id, home_score, away_score, match_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	query := `INSERT INTO matches (match_ref_id, league_id, stage_id, start_date, start_time, home_team_id, away_team_id, home_score, away_score, match_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	var stageID interface{} = nil
 	if req.StageID != nil && *req.StageID > 0 {
 		stageID = *req.StageID
 	}
 	matchRefID := req.MatchRefID
 	if matchRefID == 0 {
-		matchRefID = 0000
+		rand.Seed(time.Now().UnixNano())
+		matchRefID = 1000 + rand.Intn(9000) // สุ่มเลข 4 หลักขึ้นต้นด้วย 1xxx ถึง 9xxx
 	}
 	_, err := DB.Exec(query, matchRefID, req.LeagueID, stageID, req.StartDate, req.StartTime, req.HomeTeamID, req.AwayTeamID, req.HomeScore, req.AwayScore, req.MatchStatus)
 	if err != nil {
@@ -373,6 +376,10 @@ func GetMatches(w http.ResponseWriter, r *http.Request) {
 		if match.TeamPostAway == nil || *match.TeamPostAway == "" {
 			zero := "0"
 			match.TeamPostAway = &zero
+		}
+		// ถ้า status ว่าง ให้เติม "ADD"
+		if match.Status == "" {
+			match.Status = "ADD"
 		}
 		matches = append(matches, match)
 	}

@@ -116,6 +116,8 @@ func scrapeMatchesByConfig(db *sql.DB, baseURL string, pages []int, tournamentPa
 					matchStatus = sql.NullString{String: "FINISHED", Valid: true}
 				case "1":
 					matchStatus = sql.NullString{String: "FIXTURE", Valid: true}
+				case "":
+					matchStatus = sql.NullString{String: "ADD", Valid: true}
 				default:
 					matchStatus = sql.NullString{String: statusStr, Valid: true}
 				}
@@ -127,9 +129,14 @@ func scrapeMatchesByConfig(db *sql.DB, baseURL string, pages []int, tournamentPa
 					matchStatus = sql.NullString{String: "FINISHED", Valid: true}
 				case "1":
 					matchStatus = sql.NullString{String: "FIXTURE", Valid: true}
+				case "":
+					matchStatus = sql.NullString{String: "ADD", Valid: true}
 				default:
 					matchStatus = sql.NullString{String: statusStr, Valid: true}
 				}
+			} else {
+				// ถ้าไม่มีค่าเลย ให้เป็น "ADD"
+				matchStatus = sql.NullString{String: "ADD", Valid: true}
 			}
 
 			// เตรียมโครงสร้าง MatchDB
