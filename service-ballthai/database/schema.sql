@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS `standings` (
     `league_id` INT NOT NULL,           -- Foreign Key อ้างอิงไปยังตาราง leagues
     `team_id` INT NOT NULL,             -- Foreign Key อ้างอิงไปยังตาราง teams
     `round` INT,                        -- รอบการแข่งขัน (ถ้ามี)
-    `stage_name` VARCHAR(255),          -- เพิ่ม: ชื่อโซน/สเตจย่อย (เช่น SOUTH, NORTH)
+    `stage_id` INT,                     -- เพิ่ม: FK ไปตาราง stage
     `matches_played` INT DEFAULT 0,     -- จำนวนนัดที่ลงแข่ง
     `wins` INT DEFAULT 0,               -- จำนวนนัดที่ชนะ
     `draws` INT DEFAULT 0,              -- จำนวนนัดที่เสมอ
@@ -110,11 +110,18 @@ CREATE TABLE IF NOT EXISTS `standings` (
     `goal_difference` INT DEFAULT 0,    -- ผลต่างประตูได้เสีย
     `points` INT DEFAULT 0,             -- คะแนนรวม
     `current_rank` INT,                 -- อันดับปัจจุบัน
-    UNIQUE (`league_id`, `team_id`, `stage_name`), -- กำหนดให้แต่ละทีมมีข้อมูลคะแนนเดียวในแต่ละลีกและสเตจ
+    UNIQUE (`league_id`, `team_id`, `stage_id`), -- กำหนดให้แต่ละทีมมีข้อมูลคะแนนเดียวในแต่ละลีกและสเตจ
     FOREIGN KEY (`league_id`) REFERENCES `leagues`(`id`),
     FOREIGN KEY (`team_id`) REFERENCES `teams`(`id`)
 );
 
+
+
+-- สร้างตาราง stage (โซน/ประเภทการแข่งขัน)
+CREATE TABLE IF NOT EXISTS `stage` (
+    `id` INT PRIMARY KEY AUTO_INCREMENT,
+    `stage_name` VARCHAR(255) NOT NULL UNIQUE
+);
 
 -- 9. สร้างตาราง matches (แมตช์การแข่งขัน)
 -- ตารางนี้เก็บข้อมูลการแข่งขันแต่ละนัด
@@ -124,7 +131,8 @@ CREATE TABLE IF NOT EXISTS `matches` (
     `start_date` DATE NOT NULL,
     `start_time` TIME NOT NULL,
     `league_id` INT,                    -- Foreign Key อ้างอิงไปยังตาราง leagues
-    `stage_name` VARCHAR(255),          -- เพิ่ม: ชื่อโซน/สเตจย่อย (เช่น SOUTH, NORTH)
+    `stage_id` INT,                     -- FK ไปตาราง stage
+    `stadium_id` INT,                   -- เพิ่ม: FK ไปตาราง stadiums
     `home_team_id` INT,                 -- Foreign Key อ้างอิงไปยังตาราง teams (ทีมเหย้า)
     `away_team_id` INT,                 -- Foreign Key อ้างอิงไปยังตาราง teams (ทีมเยือน)
     `channel_id` INT,                   -- Foreign Key อ้างอิงไปยังตาราง channels (ช่องทีวีหลัก)
@@ -136,10 +144,13 @@ CREATE TABLE IF NOT EXISTS `matches` (
     FOREIGN KEY (`home_team_id`) REFERENCES `teams`(`id`),
     FOREIGN KEY (`away_team_id`) REFERENCES `teams`(`id`),
     FOREIGN KEY (`channel_id`) REFERENCES `channels`(`id`),
-    FOREIGN KEY (`live_channel_id`) REFERENCES `channels`(`id`)
+    FOREIGN KEY (`live_channel_id`) REFERENCES `channels`(`id`),
+    FOREIGN KEY (`stage_id`) REFERENCES `stage`(`id`),
+    FOREIGN KEY (`stadium_id`) REFERENCES `stadiums`(`id`)
 );
 
 -- 10. เพิ่ม Foreign Keys เพื่อแก้ไขปัญหา Circular Dependency
+
 ALTER TABLE `stadiums` ADD CONSTRAINT `fk_stadiums_team_id` FOREIGN KEY (`team_id`) REFERENCES `teams`(`id`);
 ALTER TABLE `teams` ADD CONSTRAINT `fk_teams_stadium_id` FOREIGN KEY (`stadium_id`) REFERENCES `stadiums`(`id`);
 

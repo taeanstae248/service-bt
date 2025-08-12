@@ -56,6 +56,7 @@ func main() {
 	router.HandleFunc("/api/leagues/{id}", handlers.UpdateLeague).Methods("PUT")
 	router.HandleFunc("/api/leagues/{id}", handlers.DeleteLeague).Methods("DELETE")
 	router.HandleFunc("/api/teams", handlers.GetTeams).Methods("GET")
+	router.HandleFunc("/api/stages", handlers.GetStages).Methods("GET")
 	router.HandleFunc("/api/teams/search", handlers.SearchTeams).Methods("GET")
 	router.HandleFunc("/api/teams", handlers.CreateTeam).Methods("POST")
 	router.HandleFunc("/api/teams/{id}", handlers.GetTeamByID).Methods("GET")
@@ -89,6 +90,10 @@ func main() {
 
 	router.HandleFunc("/leagues.html", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./templates/leagues.html")
+	})
+
+	router.HandleFunc("/matches.html", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./templates/matches.html")
 	})
 
 	// Redirect root to login

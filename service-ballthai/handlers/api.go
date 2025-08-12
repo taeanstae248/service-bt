@@ -10,6 +10,36 @@ import (
 	"github.com/gorilla/mux"
 )
 
+// GetStages returns unique stage_name from stage_name table
+func GetStages(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	query := `SELECT DISTINCT stage_name FROM stage_name WHERE stage_name IS NOT NULL AND stage_name != '' ORDER BY stage_name`
+	rows, err := DB.Query(query)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+	var stages []struct {
+		StageName string `json:"stage_name"`
+	}
+	for rows.Next() {
+		var s struct {
+			StageName string `json:"stage_name"`
+		}
+		if err := rows.Scan(&s.StageName); err != nil {
+			http.Error(w, fmt.Sprintf("Scan error: %v", err), http.StatusInternalServerError)
+			return
+		}
+		stages = append(stages, s)
+	}
+	response := APIResponse{
+		Success: true,
+		Data:    stages,
+	}
+	json.NewEncoder(w).Encode(response)
+}
+
 // Data structures
 type League struct {
 	ID   int    `json:"id"`
@@ -40,6 +70,7 @@ type Match struct {
 	HomeScore    *int    `json:"home_score"`
 	AwayScore    *int    `json:"away_score"`
 	StartDate    string  `json:"start_date"`
+	StartTime    *string `json:"start_time,omitempty"`
 	Stadium      *string `json:"stadium,omitempty"`
 	Status       string  `json:"status"`
 	LeagueID     *int    `json:"league_id,omitempty"`
@@ -221,7 +252,8 @@ func GetMatches(w http.ResponseWriter, r *http.Request) {
 	offsetStr := r.URL.Query().Get("offset")
 	leagueIDStr := r.URL.Query().Get("league_id")
 	leagueName := r.URL.Query().Get("league")
-	scoreOnly := r.URL.Query().Get("score")
+	// scoreOnly := r.URL.Query().Get("score") // ไม่ได้ใช้งาน
+	dateStr := r.URL.Query().Get("date")
 
 	limit := 20 // default
 	offset := 0 // default
@@ -241,7 +273,7 @@ func GetMatches(w http.ResponseWriter, r *http.Request) {
 
 	query := `
 		 SELECT m.id, ht.name_th as home_team, at.name_th as away_team, 
-			 m.home_score, m.away_score, m.start_date, s.name as stadium,
+			 m.home_score, m.away_score, m.start_date, m.start_time, s.name as stadium,
 			 m.match_status, m.league_id, l.name as league_name,
 			 ht.team_post_ballthai as team_post_home, at.team_post_ballthai as team_post_away
 		 FROM matches m
@@ -269,11 +301,13 @@ func GetMatches(w http.ResponseWriter, r *http.Request) {
 		args = append(args, leagueName)
 	}
 
-	// Filter by score (matches in the past)
-	if scoreOnly == "true" {
-		query += " AND m.start_date <= CURDATE()"
+	// Filter by date (exact match yyyy-MM-dd)
+	if dateStr != "" {
+		query += " AND DATE(m.start_date) = ?"
+		args = append(args, dateStr)
 	} else {
-		query += " AND m.start_date > CURDATE()"
+		// ถ้าไม่ส่ง date ให้แสดงเฉพาะวันปัจจุบัน
+		query += " AND DATE(m.start_date) = CURDATE()"
 	}
 
 	query += " ORDER BY m.start_date DESC LIMIT ? OFFSET ?"
@@ -290,7 +324,7 @@ func GetMatches(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var match Match
 		if err := rows.Scan(&match.ID, &match.HomeTeam, &match.AwayTeam,
-			&match.HomeScore, &match.AwayScore, &match.StartDate,
+			&match.HomeScore, &match.AwayScore, &match.StartDate, &match.StartTime,
 			&match.Stadium, &match.Status, &match.LeagueID, &match.LeagueName,
 			&match.TeamPostHome, &match.TeamPostAway); err != nil {
 			http.Error(w, fmt.Sprintf("Scan error: %v", err), http.StatusInternalServerError)
