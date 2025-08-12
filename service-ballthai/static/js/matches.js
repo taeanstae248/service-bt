@@ -80,49 +80,53 @@ function fetchMatches(dateParam) {
 }
 function addMatch() {
     // Fetch leagues, stage_name, teams for dropdowns
-    Promise.all([
-        fetch('/api/leagues').then(res => res.json()),
-        fetch('/api/stages').then(res => res.json()),
-        fetch('/api/teams').then(res => res.json())
-    ]).then(([leaguesData, stagesData, teamsData]) => {
-        // Leagues dropdown
+    // เติมลีก
+    fetch('/api/leagues').then(res => res.json()).then(leaguesData => {
         const leagueSelect = document.getElementById('league_select');
-        if (leagueSelect) {
-            leagueSelect.innerHTML = '<option value="">-- เลือกลีก --</option>';
-            if (leaguesData.success && Array.isArray(leaguesData.data)) {
-                leaguesData.data.forEach(lg => {
-                    leagueSelect.innerHTML += `<option value="${lg.id}">${lg.name}</option>`;
-                });
-            }
+        leagueSelect.innerHTML = '<option value="">-- เลือกลีก --</option>';
+        if (leaguesData.success && Array.isArray(leaguesData.data)) {
+            leaguesData.data.forEach(lg => {
+                leagueSelect.innerHTML += `<option value="${lg.id}">${lg.name}</option>`;
+            });
         }
-        // Stage_name dropdown
-        const stageSelect = document.getElementById('stage_name_select');
-        if (stageSelect) {
-            stageSelect.innerHTML = '<option value="">-- เลือกประเภทการแข่งขัน --</option>';
-            if (stagesData.success && Array.isArray(stagesData.data)) {
-                const uniqueStages = [...new Set(stagesData.data.map(s => s.stage_name))];
-                uniqueStages.forEach(stage => {
-                    if (stage) stageSelect.innerHTML += `<option value="${stage}">${stage}</option>`;
-                });
-            }
-        }
-        // Teams dropdowns
+    });
+    // เติม stage
+        fetch('/api/stages')
+            .then(res => {
+                if (!res.ok) throw new Error('Network response was not ok');
+                return res.json();
+            })
+            .then(stagesData => {
+                const stageSelect = document.getElementById('stage_name_select');
+                stageSelect.innerHTML = '<option value="">-- เลือกประเภทการแข่งขัน --</option>';
+                if (stagesData.success && Array.isArray(stagesData.data) && stagesData.data.length > 0) {
+                    stagesData.data.forEach(stage => {
+                        if (stage.stage_name && stage.id) {
+                            stageSelect.innerHTML += `<option value="${stage.id}">${stage.stage_name}</option>`;
+                        }
+                    });
+                } else {
+                    alert('ไม่พบข้อมูลประเภทการแข่งขัน (stage)');
+                }
+            })
+            .catch(err => {
+                alert('เกิดข้อผิดพลาดในการโหลดประเภทการแข่งขัน: ' + err.message);
+            });
+    // เติมทีมเหย้า/ทีมเยือน
+    fetch('/api/teams').then(res => res.json()).then(teamsData => {
         const homeTeamSelect = document.getElementById('home_team_select');
         const awayTeamSelect = document.getElementById('away_team_select');
-        if (homeTeamSelect && awayTeamSelect) {
-            homeTeamSelect.innerHTML = '<option value="">-- เลือกทีมเหย้า --</option>';
-            awayTeamSelect.innerHTML = '<option value="">-- เลือกทีมเยือน --</option>';
-            if (teamsData.success && Array.isArray(teamsData.data)) {
-                teamsData.data.forEach(team => {
-                    homeTeamSelect.innerHTML += `<option value="${team.id}">${team.name}</option>`;
-                    awayTeamSelect.innerHTML += `<option value="${team.id}">${team.name}</option>`;
-                });
-            }
+        homeTeamSelect.innerHTML = '<option value="">-- เลือกทีมเหย้า --</option>';
+        awayTeamSelect.innerHTML = '<option value="">-- เลือกทีมเยือน --</option>';
+        if (teamsData.success && Array.isArray(teamsData.data)) {
+            teamsData.data.forEach(team => {
+                homeTeamSelect.innerHTML += `<option value="${team.id}">${team.name_th}</option>`;
+                awayTeamSelect.innerHTML += `<option value="${team.id}">${team.name_th}</option>`;
+            });
         }
-        document.getElementById('addMatchModal').style.display = 'flex';
-    }).catch(() => {
-        document.getElementById('addMatchModal').style.display = 'flex';
     });
+    // เปิด modal ทันที
+    document.getElementById('addMatchModal').style.display = 'flex';
 }
 
 function closeAddMatchModal() {
@@ -136,14 +140,14 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             const formData = new FormData(addMatchForm);
             const payload = {
-                league_id: formData.get('league_id'),
-                stage_name: formData.get('stage_name'),
+                league_id: Number(formData.get('league_id')),
+                stage_id: Number(formData.get('stage_name')),
                 start_date: formData.get('start_date'),
                 start_time: formData.get('start_time'),
-                home_team_id: formData.get('home_team_id'),
-                away_team_id: formData.get('away_team_id'),
-                home_score: formData.get('home_score'),
-                away_score: formData.get('away_score')
+                home_team_id: Number(formData.get('home_team_id')),
+                away_team_id: Number(formData.get('away_team_id')),
+                home_score: formData.get('home_score') ? Number(formData.get('home_score')) : null,
+                away_score: formData.get('away_score') ? Number(formData.get('away_score')) : null
             };
             fetch('/api/matches', {
                 method: 'POST',

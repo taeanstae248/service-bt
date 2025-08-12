@@ -13,7 +13,7 @@ import (
 // GetStages returns unique stage_name from stage_name table
 func GetStages(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	query := `SELECT DISTINCT stage_name FROM stage_name WHERE stage_name IS NOT NULL AND stage_name != '' ORDER BY stage_name`
+	query := `SELECT id, stage_name FROM stage WHERE stage_name IS NOT NULL AND stage_name != '' ORDER BY stage_name`
 	rows, err := DB.Query(query)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
@@ -21,13 +21,15 @@ func GetStages(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 	var stages []struct {
+		ID        int    `json:"id"`
 		StageName string `json:"stage_name"`
 	}
 	for rows.Next() {
 		var s struct {
+			ID        int    `json:"id"`
 			StageName string `json:"stage_name"`
 		}
-		if err := rows.Scan(&s.StageName); err != nil {
+		if err := rows.Scan(&s.ID, &s.StageName); err != nil {
 			http.Error(w, fmt.Sprintf("Scan error: %v", err), http.StatusInternalServerError)
 			return
 		}
@@ -48,7 +50,7 @@ type League struct {
 
 type Team struct {
 	ID              int     `json:"id"`
-	Name            string  `json:"name"`
+	NameTh          string  `json:"name_th"`
 	TeamPostID      *int    `json:"team_post_id,omitempty"`
 	StadiumID       *int    `json:"stadium_id,omitempty"`
 	StadiumName     *string `json:"stadium_name,omitempty"`
@@ -158,7 +160,7 @@ func GetTeams(w http.ResponseWriter, r *http.Request) {
 	var teams []Team
 	for rows.Next() {
 		var team Team
-		if err := rows.Scan(&team.ID, &team.Name, &team.TeamPostID, &team.StadiumID,
+		if err := rows.Scan(&team.ID, &team.NameTh, &team.TeamPostID, &team.StadiumID,
 			&team.StadiumName, &team.Logo, &team.EstablishedYear); err != nil {
 			http.Error(w, fmt.Sprintf("Scan error: %v", err), http.StatusInternalServerError)
 			return
@@ -194,7 +196,7 @@ func GetTeamByID(w http.ResponseWriter, r *http.Request) {
 	`
 
 	var team Team
-	err = DB.QueryRow(query, teamID).Scan(&team.ID, &team.Name, &team.TeamPostID,
+	err = DB.QueryRow(query, teamID).Scan(&team.ID, &team.NameTh, &team.TeamPostID,
 		&team.StadiumID, &team.StadiumName, &team.Logo, &team.EstablishedYear)
 
 	if err == sql.ErrNoRows {

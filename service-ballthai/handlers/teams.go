@@ -21,6 +21,7 @@ func CreateTeam(w http.ResponseWriter, r *http.Request) {
 
 	var team struct {
 		Name       string `json:"name"`
+		NameTh     string `json:"name_th"`
 		StadiumID  *int   `json:"stadium_id"`
 		TeamPostID *int   `json:"team_post_id"`
 		LogoURL    string `json:"logo_url"`
@@ -31,7 +32,7 @@ func CreateTeam(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if team.Name == "" {
+	if team.NameTh == "" {
 		http.Error(w, `{"success": false, "error": "Team name is required"}`, http.StatusBadRequest)
 		return
 	}
@@ -41,7 +42,7 @@ func CreateTeam(w http.ResponseWriter, r *http.Request) {
 		VALUES (?, ?, ?, ?)
 	`
 
-	result, err := DB.Exec(query, team.Name, team.StadiumID, team.TeamPostID, team.LogoURL)
+	result, err := DB.Exec(query, team.NameTh, team.StadiumID, team.TeamPostID, team.LogoURL)
 	if err != nil {
 		log.Printf("Error creating team: %v", err)
 		http.Error(w, `{"success": false, "error": "Failed to create team"}`, http.StatusInternalServerError)
@@ -74,6 +75,7 @@ func UpdateTeam(w http.ResponseWriter, r *http.Request) {
 
 	var team struct {
 		Name       string `json:"name"`
+		NameTh     string `json:"name_th"`
 		StadiumID  *int   `json:"stadium_id"`
 		TeamPostID *int   `json:"team_post_id"`
 		LogoURL    string `json:"logo_url"`
@@ -90,7 +92,7 @@ func UpdateTeam(w http.ResponseWriter, r *http.Request) {
 		WHERE id = ?
 	`
 
-	_, err = DB.Exec(query, team.Name, team.StadiumID, team.TeamPostID, team.LogoURL, teamID)
+	_, err = DB.Exec(query, team.NameTh, team.StadiumID, team.TeamPostID, team.LogoURL, teamID)
 	if err != nil {
 		log.Printf("Error updating team: %v", err)
 		http.Error(w, `{"success": false, "error": "Failed to update team"}`, http.StatusInternalServerError)
@@ -175,7 +177,7 @@ func SearchTeams(w http.ResponseWriter, r *http.Request) {
 	var teams []Team
 	for rows.Next() {
 		var team Team
-		if err := rows.Scan(&team.ID, &team.Name, &team.TeamPostID, &team.StadiumID,
+	if err := rows.Scan(&team.ID, &team.NameTh, &team.TeamPostID, &team.StadiumID,
 			&team.StadiumName, &team.Logo, &team.EstablishedYear); err != nil {
 			http.Error(w, fmt.Sprintf("Scan error: %v", err), http.StatusInternalServerError)
 			return
