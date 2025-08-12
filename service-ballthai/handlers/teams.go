@@ -177,7 +177,7 @@ func SearchTeams(w http.ResponseWriter, r *http.Request) {
 	var teams []Team
 	for rows.Next() {
 		var team Team
-	if err := rows.Scan(&team.ID, &team.NameTh, &team.TeamPostID, &team.StadiumID,
+		if err := rows.Scan(&team.ID, &team.NameTh, &team.TeamPostID, &team.StadiumID,
 			&team.StadiumName, &team.Logo, &team.EstablishedYear); err != nil {
 			http.Error(w, fmt.Sprintf("Scan error: %v", err), http.StatusInternalServerError)
 			return

@@ -55,6 +55,18 @@
                             </select>
                         </div>
                         <div style="margin-bottom:1rem;">
+                            <label>Channel (ทีวีหลัก)</label>
+                            <select name="channel_id" id="channel_select" class="search-input">
+                                <option value="">-- เลือกช่องทีวี --</option>
+                            </select>
+                        </div>
+                        <div style="margin-bottom:1rem;">
+                            <label>Live Channel</label>
+                            <select name="live_channel_id" id="live_channel_select" class="search-input">
+                                <option value="">-- เลือกช่องถ่ายทอดสด --</option>
+                            </select>
+                        </div>
+                        <div style="margin-bottom:1rem;">
                             <label>สนามแข่งขัน</label>
                             <select name="stadium_id" id="stadium_select"  class="search-input">
                                 <option value="">-- เลือกสนาม --</option>
@@ -83,6 +95,13 @@
                     <div style="margin-bottom:1rem;">
                         <label>สกอร์</label>
                         <input type="number" name="home_score" min="0" value="0" style="width:60px;"> - <input type="number" name="away_score" min="0" value="0" style="width:60px;">
+                    </div>
+                    <div style="margin-bottom:1rem;">
+                        <label>สถานะการแข่งขัน</label>
+                        <select name="match_status" id="match_status_select" class="search-input" required>
+                            <option value="FINISHED">FINISHED</option>
+                            <option value="OFF">OFF</option>
+                        </select>
                     </div>
                     <div style="display:flex; justify-content:flex-end; gap:8px;">
                         <button type="button" class="btn" onclick="closeAddMatchModal()">ยกเลิก</button>

@@ -79,8 +79,7 @@ function fetchMatches(dateParam) {
         });
 }
 function addMatch() {
-    // Fetch leagues, stage_name, teams for dropdowns
-    // เติมลีก
+    // Fetch leagues, stage_name, teams, channels for dropdowns
     fetch('/api/leagues').then(res => res.json()).then(leaguesData => {
         const leagueSelect = document.getElementById('league_select');
         leagueSelect.innerHTML = '<option value="">-- เลือกลีก --</option>';
@@ -91,27 +90,44 @@ function addMatch() {
         }
     });
     // เติม stage
-        fetch('/api/stages')
-            .then(res => {
-                if (!res.ok) throw new Error('Network response was not ok');
-                return res.json();
-            })
-            .then(stagesData => {
-                const stageSelect = document.getElementById('stage_name_select');
-                stageSelect.innerHTML = '<option value="">-- เลือกประเภทการแข่งขัน --</option>';
-                if (stagesData.success && Array.isArray(stagesData.data) && stagesData.data.length > 0) {
-                    stagesData.data.forEach(stage => {
-                        if (stage.stage_name && stage.id) {
-                            stageSelect.innerHTML += `<option value="${stage.id}">${stage.stage_name}</option>`;
-                        }
-                    });
+    fetch('/api/stages')
+        .then(res => {
+            if (!res.ok) throw new Error('Network response was not ok');
+            return res.json();
+        })
+        .then(stagesData => {
+            const stageSelect = document.getElementById('stage_name_select');
+            stageSelect.innerHTML = '<option value="">-- เลือกประเภทการแข่งขัน --</option>';
+            stageSelect.innerHTML += '<option value="0">(ไม่ระบุประเภทการแข่งขัน)</option>';
+            if (stagesData.success && Array.isArray(stagesData.data) && stagesData.data.length > 0) {
+                stagesData.data.forEach(stage => {
+                    if (stage.stage_name && stage.id) {
+                        stageSelect.innerHTML += `<option value="${stage.id}">${stage.stage_name}</option>`;
+                    }
+                });
+            } else {
+                alert('ไม่พบข้อมูลประเภทการแข่งขัน (stage)');
+            }
+        })
+        .catch(err => {
+            alert('เกิดข้อผิดพลาดในการโหลดประเภทการแข่งขัน: ' + err.message);
+        });
+    // เติมช่องทีวีและช่องถ่ายทอดสด
+    fetch('/api/channels').then(res => res.json()).then(channelsData => {
+        const channelSelect = document.getElementById('channel_select');
+        const liveChannelSelect = document.getElementById('live_channel_select');
+        channelSelect.innerHTML = '<option value="">-- เลือกช่องทีวี --</option>';
+        liveChannelSelect.innerHTML = '<option value="">-- เลือกช่องถ่ายทอดสด --</option>';
+        if (channelsData.success && Array.isArray(channelsData.data)) {
+            channelsData.data.forEach(ch => {
+                if (ch.type === 'TV') {
+                    channelSelect.innerHTML += `<option value="${ch.id}">${ch.name}</option>`;
                 } else {
-                    alert('ไม่พบข้อมูลประเภทการแข่งขัน (stage)');
+                    liveChannelSelect.innerHTML += `<option value="${ch.id}">${ch.name}</option>`;
                 }
-            })
-            .catch(err => {
-                alert('เกิดข้อผิดพลาดในการโหลดประเภทการแข่งขัน: ' + err.message);
             });
+        }
+    });
     // เติมทีมเหย้า/ทีมเยือน
     fetch('/api/teams').then(res => res.json()).then(teamsData => {
         const homeTeamSelect = document.getElementById('home_team_select');
@@ -139,15 +155,23 @@ document.addEventListener('DOMContentLoaded', function() {
         addMatchForm.addEventListener('submit', function(e) {
             e.preventDefault();
             const formData = new FormData(addMatchForm);
+            let stageValue = formData.get('stage_name');
+            let stage_id = null;
+            if (stageValue && stageValue !== "null" && stageValue !== "") {
+                stage_id = Number(stageValue);
+            } else {
+                stage_id = null;
+            }
             const payload = {
                 league_id: Number(formData.get('league_id')),
-                stage_id: Number(formData.get('stage_name')),
+                stage_id: stage_id,
                 start_date: formData.get('start_date'),
                 start_time: formData.get('start_time'),
                 home_team_id: Number(formData.get('home_team_id')),
                 away_team_id: Number(formData.get('away_team_id')),
                 home_score: formData.get('home_score') ? Number(formData.get('home_score')) : null,
-                away_score: formData.get('away_score') ? Number(formData.get('away_score')) : null
+                away_score: formData.get('away_score') ? Number(formData.get('away_score')) : null,
+                match_status: formData.get('match_status')
             };
             fetch('/api/matches', {
                 method: 'POST',

@@ -10,38 +10,6 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// GetStages returns unique stage_name from stage_name table
-func GetStages(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	query := `SELECT id, stage_name FROM stage WHERE stage_name IS NOT NULL AND stage_name != '' ORDER BY stage_name`
-	rows, err := DB.Query(query)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
-		return
-	}
-	defer rows.Close()
-	var stages []struct {
-		ID        int    `json:"id"`
-		StageName string `json:"stage_name"`
-	}
-	for rows.Next() {
-		var s struct {
-			ID        int    `json:"id"`
-			StageName string `json:"stage_name"`
-		}
-		if err := rows.Scan(&s.ID, &s.StageName); err != nil {
-			http.Error(w, fmt.Sprintf("Scan error: %v", err), http.StatusInternalServerError)
-			return
-		}
-		stages = append(stages, s)
-	}
-	response := APIResponse{
-		Success: true,
-		Data:    stages,
-	}
-	json.NewEncoder(w).Encode(response)
-}
-
 // Data structures
 type League struct {
 	ID   int    `json:"id"`
@@ -245,31 +213,75 @@ func GetStadiums(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// GetMatches returns matches with optional pagination and league filter
+// GetChannels returns all channels (for TV and Live)
+func GetChannels(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	query := `SELECT id, name, type FROM channels ORDER BY name`
+	rows, err := DB.Query(query)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+	var channels []struct {
+		ID   int    `json:"id"`
+		Name string `json:"name"`
+		Type string `json:"type"`
+	}
+	for rows.Next() {
+		var c struct {
+			ID   int    `json:"id"`
+			Name string `json:"name"`
+			Type string `json:"type"`
+		}
+		if err := rows.Scan(&c.ID, &c.Name, &c.Type); err != nil {
+			http.Error(w, fmt.Sprintf("Scan error: %v", err), http.StatusInternalServerError)
+			return
+		}
+		channels = append(channels, c)
+	}
+	response := APIResponse{
+		Success: true,
+		Data:    channels,
+	}
+	json.NewEncoder(w).Encode(response)
+}
+
 // CreateMatch handles POST /api/matches
 func CreateMatch(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var req struct {
-		LeagueID    int    `json:"league_id"`
-		StageID     int    `json:"stage_id"`
-		StartDate   string `json:"start_date"`
-		StartTime   string `json:"start_time"`
-		HomeTeamID  int    `json:"home_team_id"`
-		AwayTeamID  int    `json:"away_team_id"`
-		HomeScore   int    `json:"home_score"`
-		AwayScore   int    `json:"away_score"`
+		LeagueID    int     `json:"league_id"`
+		StageID     *int    `json:"stage_id"`
+		StartDate   string  `json:"start_date"`
+		StartTime   string  `json:"start_time"`
+		HomeTeamID  int     `json:"home_team_id"`
+		AwayTeamID  int     `json:"away_team_id"`
+		HomeScore   int     `json:"home_score"`
+		AwayScore   int     `json:"away_score"`
+		MatchRefID  int     `json:"match_ref_id"`
+		MatchStatus string  `json:"match_status"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, `{"success": false, "error": "Invalid request body"}`, http.StatusBadRequest)
 		return
 	}
-	query := `INSERT INTO matches (league_id, stage_id, start_date, start_time, home_team_id, away_team_id, home_score, away_score, match_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'FIXTURE')`
-	_, err := DB.Exec(query, req.LeagueID, req.StageID, req.StartDate, req.StartTime, req.HomeTeamID, req.AwayTeamID, req.HomeScore, req.AwayScore)
+	query := `INSERT INTO matches (match_ref_id, league_id, stage_id, start_date, start_time, home_team_id, away_team_id, home_score, away_score, match_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	var stageID interface{} = nil
+	if req.StageID != nil && *req.StageID > 0 {
+		stageID = *req.StageID
+	}
+	matchRefID := req.MatchRefID
+	if matchRefID == 0 {
+		matchRefID = 0000
+	}
+	_, err := DB.Exec(query, matchRefID, req.LeagueID, stageID, req.StartDate, req.StartTime, req.HomeTeamID, req.AwayTeamID, req.HomeScore, req.AwayScore, req.MatchStatus)
 	if err != nil {
-		http.Error(w, `{"success": false, "error": "Failed to save match"}`, http.StatusInternalServerError)
+		fmt.Printf("CreateMatch DB error: %v\n", err)
+		http.Error(w, fmt.Sprintf(`{"success": false, "error": "Failed to save match: %v"}`, err), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(map[string]interface{}{ "success": true })
+	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
 }
 func GetMatches(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -370,5 +382,37 @@ func GetMatches(w http.ResponseWriter, r *http.Request) {
 		Data:    matches,
 	}
 
+	json.NewEncoder(w).Encode(response)
+}
+
+// GetStages returns unique stage_name from stage table
+func GetStages(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	query := `SELECT id, stage_name FROM stage WHERE stage_name IS NOT NULL AND stage_name != '' ORDER BY stage_name`
+	rows, err := DB.Query(query)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+	var stages []struct {
+		ID        int    `json:"id"`
+		StageName string `json:"stage_name"`
+	}
+	for rows.Next() {
+		var s struct {
+			ID        int    `json:"id"`
+			StageName string `json:"stage_name"`
+		}
+		if err := rows.Scan(&s.ID, &s.StageName); err != nil {
+			http.Error(w, fmt.Sprintf("Scan error: %v", err), http.StatusInternalServerError)
+			return
+		}
+		stages = append(stages, s)
+	}
+	response := APIResponse{
+		Success: true,
+		Data:    stages,
+	}
 	json.NewEncoder(w).Encode(response)
 }
