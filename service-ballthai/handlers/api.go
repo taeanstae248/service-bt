@@ -212,30 +212,30 @@ func GetStadiums(w http.ResponseWriter, r *http.Request) {
 
 // GetMatches returns matches with optional pagination and league filter
 func GetMatches(w http.ResponseWriter, r *http.Request) {
-       w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "application/json")
 
-       // Get query parameters
-       limitStr := r.URL.Query().Get("limit")
-       offsetStr := r.URL.Query().Get("offset")
+	// Get query parameters
+	limitStr := r.URL.Query().Get("limit")
+	offsetStr := r.URL.Query().Get("offset")
 	leagueIDStr := r.URL.Query().Get("league_id")
 	leagueName := r.URL.Query().Get("league")
 	scoreOnly := r.URL.Query().Get("score")
 
-       limit := 20 // default
-       offset := 0 // default
-       var args []interface{}
+	limit := 20 // default
+	offset := 0 // default
+	var args []interface{}
 
-       if limitStr != "" {
-	       if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
-		       limit = l
-	       }
-       }
+	if limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+			limit = l
+		}
+	}
 
-       if offsetStr != "" {
-	       if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
-		       offset = o
-	       }
-       }
+	if offsetStr != "" {
+		if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
+			offset = o
+		}
+	}
 
 	query := `
 		 SELECT m.id, ht.name_th as home_team, at.name_th as away_team, 
@@ -249,56 +249,56 @@ func GetMatches(w http.ResponseWriter, r *http.Request) {
 		 WHERE 1=1
 	`
 
-       // Add league_id filter
-       if leagueIDStr != "" {
-	       query += " AND m.league_id = ?"
-	       if leagueID, err := strconv.Atoi(leagueIDStr); err == nil {
-		       args = append(args, leagueID)
-	       } else {
-		       http.Error(w, "Invalid league_id parameter", http.StatusBadRequest)
-		       return
-	       }
-       }
+	// Add league_id filter
+	if leagueIDStr != "" {
+		query += " AND m.league_id = ?"
+		if leagueID, err := strconv.Atoi(leagueIDStr); err == nil {
+			args = append(args, leagueID)
+		} else {
+			http.Error(w, "Invalid league_id parameter", http.StatusBadRequest)
+			return
+		}
+	}
 
-       // Add league name filter
-       if leagueName != "" {
-	       query += " AND l.name = ?"
-	       args = append(args, leagueName)
-       }
+	// Add league name filter
+	if leagueName != "" {
+		query += " AND l.name = ?"
+		args = append(args, leagueName)
+	}
 
-       // Filter by score (matches in the past)
-       if scoreOnly == "true" {
-	       query += " AND m.start_date <= CURDATE()"
-       } else {
-	       query += " AND m.start_date > CURDATE()"
-       }
+	// Filter by score (matches in the past)
+	if scoreOnly == "true" {
+		query += " AND m.start_date <= CURDATE()"
+	} else {
+		query += " AND m.start_date > CURDATE()"
+	}
 
-       query += " ORDER BY m.start_date DESC LIMIT ? OFFSET ?"
-       args = append(args, limit, offset)
+	query += " ORDER BY m.start_date DESC LIMIT ? OFFSET ?"
+	args = append(args, limit, offset)
 
-       rows, err := DB.Query(query, args...)
-       if err != nil {
-	       http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
-	       return
-       }
-       defer rows.Close()
+	rows, err := DB.Query(query, args...)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
 
-       var matches []Match
-       for rows.Next() {
-	       var match Match
-	       if err := rows.Scan(&match.ID, &match.HomeTeam, &match.AwayTeam,
-		       &match.HomeScore, &match.AwayScore, &match.StartDate,
-		       &match.Stadium, &match.Status, &match.LeagueID, &match.LeagueName); err != nil {
-		       http.Error(w, fmt.Sprintf("Scan error: %v", err), http.StatusInternalServerError)
-		       return
-	       }
-	       matches = append(matches, match)
-       }
+	var matches []Match
+	for rows.Next() {
+		var match Match
+		if err := rows.Scan(&match.ID, &match.HomeTeam, &match.AwayTeam,
+			&match.HomeScore, &match.AwayScore, &match.StartDate,
+			&match.Stadium, &match.Status, &match.LeagueID, &match.LeagueName); err != nil {
+			http.Error(w, fmt.Sprintf("Scan error: %v", err), http.StatusInternalServerError)
+			return
+		}
+		matches = append(matches, match)
+	}
 
-       response := APIResponse{
-	       Success: true,
-	       Data:    matches,
-       }
+	response := APIResponse{
+		Success: true,
+		Data:    matches,
+	}
 
-       json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(response)
 }
