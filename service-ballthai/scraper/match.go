@@ -25,6 +25,23 @@ func scrapeMatchesByConfig(db *sql.DB, baseURL string, pages []int, tournamentPa
 		}
 
 		for _, apiMatch := range apiResponse.Results {
+			// --- เพิ่ม: จัดเก็บข้อมูลลีก ---
+			var leagueID int
+			if apiMatch.TournamentName != "" {
+				leagueID, err = database.GetLeagueID(db, apiMatch.TournamentNameEN, apiMatch.TournamentName)
+				if err != nil {
+					log.Printf("Warning: Failed to insert/update league for match %d (%s): %v", apiMatch.ID, apiMatch.TournamentName, err)
+				}
+			}
+
+			// --- เพิ่ม: ดึง stage_id จากชื่อ stage_name แล้วนำไปเก็บใน matches ---
+			var stageID int
+			if apiMatch.StageName != "" {
+				stageID, err = database.GetStageID(db, apiMatch.StageName, leagueID)
+				if err != nil {
+					log.Printf("Warning: Failed to insert/update stage for match %d (%s): %v", apiMatch.ID, apiMatch.StageName, err)
+				}
+			}
 			// ดาวน์โหลดโลโก้ทีมเหย้า
 			homeLogoPath := ""
 			if apiMatch.HomeTeamLogo != "" {
@@ -120,7 +137,8 @@ func scrapeMatchesByConfig(db *sql.DB, baseURL string, pages []int, tournamentPa
 				MatchRefID:    apiMatch.ID,
 				StartDate:     apiMatch.StartDate,
 				StartTime:     apiMatch.StartTime,
-				LeagueID:      sql.NullInt64{Int64: int64(dbLeagueID), Valid: true}, // ใช้ DB league ID จาก config
+				LeagueID:      sql.NullInt64{Int64: int64(dbLeagueID), Valid: true},      // ใช้ DB league ID จาก config
+				StageID:       sql.NullInt64{Int64: int64(stageID), Valid: stageID != 0}, // ใช้ stage_id จาก DB ที่ได้จากชื่อ
 				HomeTeamID:    homeTeamID,
 				AwayTeamID:    awayTeamID,
 				ChannelID:     channelID,

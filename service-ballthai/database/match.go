@@ -18,13 +18,13 @@ func InsertOrUpdateMatch(db *sql.DB, match models.MatchDB) error {
 		// Insert new match
 		insertQuery := `
 			INSERT INTO matches (
-				match_ref_id, start_date, start_time, league_id,
+				match_ref_id, start_date, start_time, league_id, stage_id,
 				home_team_id, away_team_id, channel_id, live_channel_id,
 				home_score, away_score, match_status
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`
 		_, err := db.Exec(insertQuery,
-			match.MatchRefID, match.StartDate, match.StartTime, match.LeagueID,
+			match.MatchRefID, match.StartDate, match.StartTime, match.LeagueID, match.StageID,
 			match.HomeTeamID, match.AwayTeamID, match.ChannelID, match.LiveChannelID,
 			match.HomeScore, match.AwayScore, match.MatchStatus,
 		)
@@ -38,13 +38,13 @@ func InsertOrUpdateMatch(db *sql.DB, match models.MatchDB) error {
 		// Update existing match
 		updateQuery := `
 			UPDATE matches SET
-				start_date = ?, start_time = ?, league_id = ?,
+				start_date = ?, start_time = ?, league_id = ?, stage_id = ?,
 				home_team_id = ?, away_team_id = ?, channel_id = ?, live_channel_id = ?,
 				home_score = ?, away_score = ?, match_status = ?
 			WHERE match_ref_id = ?
 		`
 		_, err := db.Exec(updateQuery,
-			match.StartDate, match.StartTime, match.LeagueID,
+			match.StartDate, match.StartTime, match.LeagueID, match.StageID,
 			match.HomeTeamID, match.AwayTeamID, match.ChannelID, match.LiveChannelID,
 			match.HomeScore, match.AwayScore, match.MatchStatus,
 			match.MatchRefID,

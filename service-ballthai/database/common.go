@@ -82,3 +82,28 @@ func GetLeagueID(db *sql.DB, leagueName, leagueNameThai string) (int, error) {
 	log.Printf("Found existing league: %s (ID: %d)", leagueNameThai, leagueID)
 	return leagueID, nil
 }
+
+// GetStageID checks if stage exists by name, inserts if not, and returns ID
+func GetStageID(db *sql.DB, stageName string, leagueID int) (int, error) {
+	var stageID int
+	query := "SELECT id FROM stage WHERE REPLACE(stage_name, ' ', '') = REPLACE(?, ' ', '')"
+	err := db.QueryRow(query, stageName).Scan(&stageID)
+
+	if err == sql.ErrNoRows {
+		insertQuery := `INSERT INTO stage (stage_name) VALUES (?)`
+		result, err := db.Exec(insertQuery, stageName)
+		if err != nil {
+			return 0, fmt.Errorf("failed to insert new stage %s: %w", stageName, err)
+		}
+		newID, err := result.LastInsertId()
+		if err != nil {
+			return 0, fmt.Errorf("failed to get last insert ID for stage %s: %w", stageName, err)
+		}
+		log.Printf("Inserted new stage: %s (ID: %d)", stageName, newID)
+		return int(newID), nil
+	} else if err != nil {
+		return 0, fmt.Errorf("failed to query stage by name %s: %w", stageName, err)
+	}
+	log.Printf("Found existing stage: %s (ID: %d)", stageName, stageID)
+	return stageID, nil
+}
