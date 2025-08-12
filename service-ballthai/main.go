@@ -2,7 +2,7 @@ package main
 
 import (
 	"database/sql"
-	"go-ballthai-scraper/api"
+	"go-ballthai-scraper/api" // Import the api package
 	"log"
 	"net/http"
 	"os"

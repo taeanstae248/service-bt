@@ -39,7 +39,7 @@ type Match struct {
 	AwayTeam   string  `json:"away_team"`
 	HomeScore  *int    `json:"home_score"`
 	AwayScore  *int    `json:"away_score"`
-	MatchDate  string  `json:"match_date"`
+	StartDate  string  `json:"start_date"`
 	Stadium    *string `json:"stadium,omitempty"`
 	Status     string  `json:"status"`
 	LeagueID   *int    `json:"league_id,omitempty"`
@@ -210,65 +210,95 @@ func GetStadiums(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// GetMatches returns matches with optional pagination
+// GetMatches returns matches with optional pagination and league filter
 func GetMatches(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+       w.Header().Set("Content-Type", "application/json")
 
-	// Get pagination parameters
-	limitStr := r.URL.Query().Get("limit")
-	offsetStr := r.URL.Query().Get("offset")
+       // Get query parameters
+       limitStr := r.URL.Query().Get("limit")
+       offsetStr := r.URL.Query().Get("offset")
+	leagueIDStr := r.URL.Query().Get("league_id")
+	leagueName := r.URL.Query().Get("league")
+	scoreOnly := r.URL.Query().Get("score")
 
-	limit := 20 // default
-	offset := 0 // default
+       limit := 20 // default
+       offset := 0 // default
+       var args []interface{}
 
-	if limitStr != "" {
-		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
-			limit = l
-		}
-	}
+       if limitStr != "" {
+	       if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+		       limit = l
+	       }
+       }
 
-	if offsetStr != "" {
-		if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
-			offset = o
-		}
-	}
+       if offsetStr != "" {
+	       if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
+		       offset = o
+	       }
+       }
 
 	query := `
-		SELECT m.id, ht.name_th as home_team, at.name_th as away_team, 
-		       m.home_score, m.away_score, m.match_date, s.name as stadium,
-		       m.status, m.league_id, l.name as league_name
-		FROM matches m
-		LEFT JOIN teams ht ON m.home_team_id = ht.id
-		LEFT JOIN teams at ON m.away_team_id = at.id
-		LEFT JOIN stadiums s ON m.stadium_id = s.id
-		LEFT JOIN leagues l ON m.league_id = l.id
-		ORDER BY m.match_date DESC
-		LIMIT ? OFFSET ?
+		 SELECT m.id, ht.name_th as home_team, at.name_th as away_team, 
+			 m.home_score, m.away_score, m.start_date, s.name as stadium,
+			 m.match_status, m.league_id, l.name as league_name
+		 FROM matches m
+		 LEFT JOIN teams ht ON m.home_team_id = ht.id
+		 LEFT JOIN teams at ON m.away_team_id = at.id
+		 LEFT JOIN stadiums s ON ht.stadium_id = s.id
+		 LEFT JOIN leagues l ON m.league_id = l.id
+		 WHERE 1=1
 	`
 
-	rows, err := DB.Query(query, limit, offset)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
-		return
-	}
-	defer rows.Close()
+       // Add league_id filter
+       if leagueIDStr != "" {
+	       query += " AND m.league_id = ?"
+	       if leagueID, err := strconv.Atoi(leagueIDStr); err == nil {
+		       args = append(args, leagueID)
+	       } else {
+		       http.Error(w, "Invalid league_id parameter", http.StatusBadRequest)
+		       return
+	       }
+       }
 
-	var matches []Match
-	for rows.Next() {
-		var match Match
-		if err := rows.Scan(&match.ID, &match.HomeTeam, &match.AwayTeam,
-			&match.HomeScore, &match.AwayScore, &match.MatchDate,
-			&match.Stadium, &match.Status, &match.LeagueID, &match.LeagueName); err != nil {
-			http.Error(w, fmt.Sprintf("Scan error: %v", err), http.StatusInternalServerError)
-			return
-		}
-		matches = append(matches, match)
-	}
+       // Add league name filter
+       if leagueName != "" {
+	       query += " AND l.name = ?"
+	       args = append(args, leagueName)
+       }
 
-	response := APIResponse{
-		Success: true,
-		Data:    matches,
-	}
+       // Filter by score (matches in the past)
+       if scoreOnly == "true" {
+	       query += " AND m.start_date <= CURDATE()"
+       } else {
+	       query += " AND m.start_date > CURDATE()"
+       }
 
-	json.NewEncoder(w).Encode(response)
+       query += " ORDER BY m.start_date DESC LIMIT ? OFFSET ?"
+       args = append(args, limit, offset)
+
+       rows, err := DB.Query(query, args...)
+       if err != nil {
+	       http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+	       return
+       }
+       defer rows.Close()
+
+       var matches []Match
+       for rows.Next() {
+	       var match Match
+	       if err := rows.Scan(&match.ID, &match.HomeTeam, &match.AwayTeam,
+		       &match.HomeScore, &match.AwayScore, &match.StartDate,
+		       &match.Stadium, &match.Status, &match.LeagueID, &match.LeagueName); err != nil {
+		       http.Error(w, fmt.Sprintf("Scan error: %v", err), http.StatusInternalServerError)
+		       return
+	       }
+	       matches = append(matches, match)
+       }
+
+       response := APIResponse{
+	       Success: true,
+	       Data:    matches,
+       }
+
+       json.NewEncoder(w).Encode(response)
 }
