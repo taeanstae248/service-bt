@@ -34,16 +34,18 @@ type Stadium struct {
 }
 
 type Match struct {
-	ID         int     `json:"id"`
-	HomeTeam   string  `json:"home_team"`
-	AwayTeam   string  `json:"away_team"`
-	HomeScore  *int    `json:"home_score"`
-	AwayScore  *int    `json:"away_score"`
-	StartDate  string  `json:"start_date"`
-	Stadium    *string `json:"stadium,omitempty"`
-	Status     string  `json:"status"`
-	LeagueID   *int    `json:"league_id,omitempty"`
-	LeagueName *string `json:"league_name,omitempty"`
+	ID           int     `json:"id"`
+	HomeTeam     string  `json:"home_team"`
+	AwayTeam     string  `json:"away_team"`
+	HomeScore    *int    `json:"home_score"`
+	AwayScore    *int    `json:"away_score"`
+	StartDate    string  `json:"start_date"`
+	Stadium      *string `json:"stadium,omitempty"`
+	Status       string  `json:"status"`
+	LeagueID     *int    `json:"league_id,omitempty"`
+	LeagueName   *string `json:"league_name,omitempty"`
+	TeamPostHome *string `json:"team_post_home,omitempty"`
+	TeamPostAway *string `json:"team_post_away,omitempty"`
 }
 
 type Player struct {
@@ -240,7 +242,8 @@ func GetMatches(w http.ResponseWriter, r *http.Request) {
 	query := `
 		 SELECT m.id, ht.name_th as home_team, at.name_th as away_team, 
 			 m.home_score, m.away_score, m.start_date, s.name as stadium,
-			 m.match_status, m.league_id, l.name as league_name
+			 m.match_status, m.league_id, l.name as league_name,
+			 ht.team_post_ballthai as team_post_home, at.team_post_ballthai as team_post_away
 		 FROM matches m
 		 LEFT JOIN teams ht ON m.home_team_id = ht.id
 		 LEFT JOIN teams at ON m.away_team_id = at.id
@@ -288,9 +291,15 @@ func GetMatches(w http.ResponseWriter, r *http.Request) {
 		var match Match
 		if err := rows.Scan(&match.ID, &match.HomeTeam, &match.AwayTeam,
 			&match.HomeScore, &match.AwayScore, &match.StartDate,
-			&match.Stadium, &match.Status, &match.LeagueID, &match.LeagueName); err != nil {
+			&match.Stadium, &match.Status, &match.LeagueID, &match.LeagueName,
+			&match.TeamPostHome, &match.TeamPostAway); err != nil {
 			http.Error(w, fmt.Sprintf("Scan error: %v", err), http.StatusInternalServerError)
 			return
+		}
+		// ถ้าไม่มีข้อมูล team_post_away ให้แสดงเป็น "0"
+		if match.TeamPostAway == nil || *match.TeamPostAway == "" {
+			zero := "0"
+			match.TeamPostAway = &zero
 		}
 		matches = append(matches, match)
 	}
