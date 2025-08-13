@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>แก้ไขตารางคะแนน | BallThai</title>
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+    <link rel="stylesheet" href="/static/css/matches.css">
+    <style>
+        .standings-table th, .standings-table td { text-align: center; }
+        .move-btn { cursor: pointer; padding: 2px 8px; }
+        .move-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div class="logo">⚽ BallThai - แก้ไขตารางคะแนน</div>
+            <div class="user-info">
+                <a href="/dashboard.html" style="color: white; text-decoration: none; margin-right: 1rem;">🏠 หน้าหลัก</a>
+                <a href="/leagues.html" style="color: white; text-decoration: none; margin-right: 1rem;">🏆 จัดการลีก</a>
+                <a href="/teams.html" style="color: white; text-decoration: none; margin-right: 1rem;">⚽ จัดการทีม</a>
+                <a href="/matches.html" style="color: white; text-decoration: none; margin-right: 1rem;">📅 จัดการแมทช์</a>
+                <a href="/standings.html" style="color: white; text-decoration: none; margin-right: 1rem; font-weight: bold;">📊 แก้ไขตารางคะแนน</a>
+                <button class="logout-btn" onclick="logout()">ออกจากระบบ</button>
+            </div>
+        </div>
+    </div>
+    <div class="container">
+        <h1>แก้ไขตารางคะแนน</h1>
+        <div style="margin-bottom:1rem;">
+            <label>เลือกลีก:</label>
+            <select id="league_select" class="search-input"></select>
+            <button onclick="fetchStandings()" class="btn-primary">🔎 แสดงตารางคะแนน</button>
+        </div>
+        <div id="standingsContainer"></div>
+    </div>
+    <script>
+    async function fetchLeagues() {
+        const res = await fetch('/api/leagues');
+        const data = await res.json();
+        const select = document.getElementById('league_select');
+        select.innerHTML = '<option value="">-- เลือกลีก --</option>';
+        if(data.success) {
+            data.data.forEach(l => {
+                select.innerHTML += `<option value="${l.id}">${l.name}</option>`;
+            });
+        }
+    }
+    async function fetchStandings() {
+        const leagueId = document.getElementById('league_select').value;
+        if(!leagueId) return;
+        const res = await fetch(`/api/standings?league_id=${leagueId}`);
+        const data = await res.json();
+        if(data.success) renderStandingsTable(data.data);
+    }
+    function renderStandingsTable(standings) {
+        let html = `<table class="standings-table" border="1" cellpadding="4" style="width:100%;margin-top:1rem;">
+            <thead><tr>
+                <th>ลำดับ</th><th>ทีม</th><th>แข่ง</th><th>ชนะ</th><th>เสมอ</th><th>แพ้</th><th>ได้</th><th>เสีย</th><th>ผลต่าง</th><th>แต้ม</th><th>เลื่อน</th><th>จัดการ</th>
+            </tr></thead><tbody>`;
+        standings.sort((a,b) => (a.current_rank?.Int64||0)-(b.current_rank?.Int64||0));
+        standings.forEach((s,i) => {
+            html += `<tr data-id="${s.id}" data-rank="${s.current_rank?.Int64||i+1}">
+                <td>${s.current_rank?.Int64||i+1}</td>
+                <td>${(s.team_name && typeof s.team_name === 'string') ? s.team_name : '-'}</td>
+                <td>${s.matches_played}</td>
+                <td>${s.wins}</td>
+                <td>${s.draws}</td>
+                <td>${s.losses}</td>
+                <td>${s.goals_for}</td>
+                <td>${s.goals_against}</td>
+                <td>${s.goal_difference}</td>
+                <td>${s.points}</td>
+                <td>
+                    <button class="move-btn" onclick="moveRow(this, -1)" ${i===0?'disabled':''}>⬆️</button>
+                    <button class="move-btn" onclick="moveRow(this, 1)" ${i===standings.length-1?'disabled':''}>⬇️</button>
+                </td>
+                <td><button onclick="editStanding(${s.id})">✏️</button></td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        html += '<button class="btn-primary" onclick="saveOrder()">💾 บันทึกอันดับ</button>';
+        document.getElementById('standingsContainer').innerHTML = html;
+    }
+    function moveRow(btn, dir) {
+        const row = btn.closest('tr');
+        const tbody = row.parentNode;
+        const idx = Array.from(tbody.children).indexOf(row);
+        if((dir === -1 && idx === 0) || (dir === 1 && idx === tbody.children.length-1)) return;
+        if(dir === -1) tbody.insertBefore(row, tbody.children[idx-1]);
+        else tbody.insertBefore(row.nextSibling, row);
+        updateMoveBtnState(tbody);
+    }
+    function updateMoveBtnState(tbody) {
+        Array.from(tbody.children).forEach((row,i,arr) => {
+            row.querySelectorAll('.move-btn')[0].disabled = i===0;
+            row.querySelectorAll('.move-btn')[1].disabled = i===arr.length-1;
+        });
+    }
+    async function saveOrder() {
+        const leagueId = document.getElementById('league_select').value;
+        const rows = document.querySelectorAll('.standings-table tbody tr');
+        const order = Array.from(rows).map((row,i) => ({ id: row.dataset.id, current_rank: i+1 }));
+        // TODO: ส่ง order นี้ไป backend เพื่ออัปเดตอันดับ
+        alert('บันทึกอันดับ (mock): '+JSON.stringify(order));
+    }
+    function editStanding(id) {
+        alert('ฟอร์มแก้ไขข้อมูลทีม/คะแนน (mock) id='+id);
+    }
+    fetchLeagues();
+    </script>
+</body>
+</html>

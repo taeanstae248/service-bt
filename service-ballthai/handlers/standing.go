@@ -22,6 +22,8 @@ func GetStandings(w http.ResponseWriter, r *http.Request) {
 	}
 	standings, err := database.GetStandingsByLeagueID(database.DB, leagueID)
 	if err != nil {
+		// log error detail for debugging
+		println("[ERROR] GetStandingsByLeagueID:", err.Error())
 		http.Error(w, `{"success": false, "error": "failed to fetch standings"}`, http.StatusInternalServerError)
 		return
 	}

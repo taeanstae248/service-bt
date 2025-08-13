@@ -106,6 +106,10 @@ func main() {
 		http.ServeFile(w, r, "./templates/matches.html")
 	})
 
+	router.HandleFunc("/standings.html", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./templates/standings.html")
+	})
+
 	// Redirect root to login
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login.html", http.StatusFound)
