@@ -31,6 +31,7 @@
             <label>เลือกลีก:</label>
             <select id="league_select" class="search-input"></select>
             <button onclick="fetchStandings()" class="btn-primary">🔎 แสดงตารางคะแนน</button>
+            <span id="stageZoneContainer" style="margin-left:1rem;"></span>
         </div>
         <div id="standingsContainer"></div>
     </div>
@@ -47,19 +48,68 @@
         }
     }
     async function fetchStandings() {
-        const leagueId = document.getElementById('league_select').value;
-        if(!leagueId) return;
-        const res = await fetch(`/api/standings?league_id=${leagueId}`);
-        const data = await res.json();
-        if(data.success) renderStandingsTable(data.data);
+    const leagueId = document.getElementById('league_select').value;
+    if(!leagueId) return;
+    const res = await fetch(`/api/standings?league_id=${leagueId}`);
+    const data = await res.json();
+    if(data.success) renderStandingsTableWithStage(data.data);
     }
     function renderStandingsTable(standings) {
+        // ...ฟังก์ชันนี้จะถูกแทนที่ด้วย renderStandingsTableWithStage...
+    }
+
+    // ฟังก์ชันใหม่: render standings พร้อม dropdown โซน/รอบ
+    function renderStandingsTableWithStage(standings) {
+        // หา unique stage_id ที่มี stage_name จริง
+        const stages = {};
+        standings.forEach(s => {
+            if(s.stage_id && s.stage_id.Valid && s.stage_name && typeof s.stage_name === 'string' && s.stage_name.trim() !== '') {
+                const id = s.stage_id.Int64;
+                if(!stages[id]) stages[id] = s.stage_name.trim();
+            }
+        });
+        const stageIds = Object.keys(stages);
+        // ถ้ามีมากกว่า 1 stage_id ให้แสดง dropdown
+        const stageZoneContainer = document.getElementById('stageZoneContainer');
+        let selectedStageId = null;
+        if(stageIds.length > 1) {
+            let html = '<label>เลือกโซน/รอบ:</label> <select id="stage_select" class="search-input">';
+            stageIds.forEach(id => {
+                html += `<option value="${id}">${stages[id]}</option>`;
+            });
+            html += '</select>';
+            stageZoneContainer.innerHTML = html;
+            selectedStageId = stageIds[0];
+            // event: เปลี่ยนโซน/รอบ
+            if(lastStageDropdown) lastStageDropdown.onchange = null;
+            const dropdown = document.getElementById('stage_select');
+            dropdown.onchange = function() {
+                renderStandingsTableWithStage._selectedStageId = this.value;
+                renderStandingsTableWithStage._allStandings = standings;
+                renderStandingsTableWithStage(standings);
+            };
+            lastStageDropdown = dropdown;
+            // จำค่าที่เลือกไว้
+            if(renderStandingsTableWithStage._selectedStageId) {
+                selectedStageId = renderStandingsTableWithStage._selectedStageId;
+            } else {
+                renderStandingsTableWithStage._selectedStageId = selectedStageId;
+            }
+        } else {
+            stageZoneContainer.innerHTML = '';
+        }
+        // filter ตาม stage_id ถ้ามี
+        let filtered = standings;
+        if(stageIds.length > 1 && renderStandingsTableWithStage._selectedStageId) {
+            filtered = standings.filter(s => s.stage_id && s.stage_id.Valid && String(s.stage_id.Int64) === String(renderStandingsTableWithStage._selectedStageId));
+        }
+        // สร้างตารางเหมือนเดิม
         let html = `<table class="standings-table" border="1" cellpadding="4" style="width:100%;margin-top:1rem;">
             <thead><tr>
                 <th>ลำดับ</th><th>ทีม</th><th>แข่ง</th><th>ชนะ</th><th>เสมอ</th><th>แพ้</th><th>ได้</th><th>เสีย</th><th>ผลต่าง</th><th>แต้ม</th><th>เลื่อน</th><th>จัดการ</th>
             </tr></thead><tbody>`;
-        standings.sort((a,b) => (a.current_rank?.Int64||0)-(b.current_rank?.Int64||0));
-        standings.forEach((s,i) => {
+        filtered.sort((a,b) => (a.current_rank?.Int64||0)-(b.current_rank?.Int64||0));
+        filtered.forEach((s,i) => {
             html += `<tr data-id="${s.id}" data-rank="${s.current_rank?.Int64||i+1}">
                 <td>${s.current_rank?.Int64||i+1}</td>
                 <td>${(s.team_name && typeof s.team_name === 'string') ? s.team_name : '-'}</td>
@@ -73,7 +123,84 @@
                 <td>${s.points}</td>
                 <td>
                     <button class="move-btn" onclick="moveRow(this, -1)" ${i===0?'disabled':''}>⬆️</button>
-                    <button class="move-btn" onclick="moveRow(this, 1)" ${i===standings.length-1?'disabled':''}>⬇️</button>
+                    <button class="move-btn" onclick="moveRow(this, 1)" ${i===filtered.length-1?'disabled':''}>⬇️</button>
+                </td>
+                <td><button onclick="editStanding(${s.id})">✏️</button></td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        html += '<button class="btn-primary" onclick="saveOrder()">💾 บันทึกอันดับ</button>';
+        document.getElementById('standingsContainer').innerHTML = html;
+    }
+
+    // ฟังก์ชันใหม่: render standings พร้อม dropdown โซน/รอบ
+    let lastStageDropdown = null;
+    function renderStandingsTableWithStage(standings) {
+        // หา unique stage_id ทั้งหมด
+        const stages = {};
+        standings.forEach(s => {
+            if(s.stage_id && s.stage_id.Valid) {
+                const id = s.stage_id.Int64;
+                // ใช้ stage_name จริงจาก record ที่เจอ id นี้ตัวแรก ถ้าไม่มีใช้ 'โซน/รอบ {id}'
+                if(!stages[id]) stages[id] = (s.stage_name && typeof s.stage_name === 'string') ? s.stage_name : `โซน/รอบ ${id}`;
+            }
+        });
+        const stageIds = Object.keys(stages);
+        // ถ้ามีมากกว่า 1 stage_id ให้แสดง dropdown
+        const stageZoneContainer = document.getElementById('stageZoneContainer');
+        let selectedStageId = null;
+        if(stageIds.length > 1) {
+            let html = '<label>เลือกโซน/รอบ:</label> <select id="stage_select" class="search-input">';
+            stageIds.forEach(id => {
+                html += `<option value="${id}">${stages[id]}</option>`;
+            });
+            html += '</select>';
+            stageZoneContainer.innerHTML = html;
+            selectedStageId = stageIds[0];
+            // event: เปลี่ยนโซน/รอบ
+            if(lastStageDropdown) lastStageDropdown.onchange = null;
+            const dropdown = document.getElementById('stage_select');
+            dropdown.onchange = function() {
+                renderStandingsTableWithStage._selectedStageId = this.value;
+                renderStandingsTableWithStage._allStandings = standings;
+                renderStandingsTableWithStage(standings);
+            };
+            lastStageDropdown = dropdown;
+            // จำค่าที่เลือกไว้
+            if(renderStandingsTableWithStage._selectedStageId) {
+                selectedStageId = renderStandingsTableWithStage._selectedStageId;
+            } else {
+                renderStandingsTableWithStage._selectedStageId = selectedStageId;
+            }
+        } else {
+            stageZoneContainer.innerHTML = '';
+        }
+        // filter ตาม stage_id ถ้ามี
+        let filtered = standings;
+        if(stageIds.length > 1 && renderStandingsTableWithStage._selectedStageId) {
+            filtered = standings.filter(s => s.stage_id && s.stage_id.Valid && String(s.stage_id.Int64) === String(renderStandingsTableWithStage._selectedStageId));
+        }
+        // สร้างตารางเหมือนเดิม
+        let html = `<table class="standings-table" border="1" cellpadding="4" style="width:100%;margin-top:1rem;">
+            <thead><tr>
+                <th>ลำดับ</th><th>ทีม</th><th>แข่ง</th><th>ชนะ</th><th>เสมอ</th><th>แพ้</th><th>ได้</th><th>เสีย</th><th>ผลต่าง</th><th>แต้ม</th><th>เลื่อน</th><th>จัดการ</th>
+            </tr></thead><tbody>`;
+        filtered.sort((a,b) => (a.current_rank?.Int64||0)-(b.current_rank?.Int64||0));
+        filtered.forEach((s,i) => {
+            html += `<tr data-id="${s.id}" data-rank="${s.current_rank?.Int64||i+1}">
+                <td>${s.current_rank?.Int64||i+1}</td>
+                <td>${(s.team_name && typeof s.team_name === 'string') ? s.team_name : '-'}</td>
+                <td>${s.matches_played}</td>
+                <td>${s.wins}</td>
+                <td>${s.draws}</td>
+                <td>${s.losses}</td>
+                <td>${s.goals_for}</td>
+                <td>${s.goals_against}</td>
+                <td>${s.goal_difference}</td>
+                <td>${s.points}</td>
+                <td>
+                    <button class="move-btn" onclick="moveRow(this, -1)" ${i===0?'disabled':''}>⬆️</button>
+                    <button class="move-btn" onclick="moveRow(this, 1)" ${i===filtered.length-1?'disabled':''}>⬇️</button>
                 </td>
                 <td><button onclick="editStanding(${s.id})">✏️</button></td>
             </tr>`;
