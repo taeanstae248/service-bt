@@ -54,6 +54,7 @@ type Match struct {
 	StartTime     *string `json:"start_time,omitempty"`
 	Stadium       *string `json:"stadium,omitempty"`
 	Status        string  `json:"status"`
+	MatchStatus   string  `json:"match_status"`
 	LeagueID      *int    `json:"league_id,omitempty"`
 	LeagueName    *string `json:"league_name,omitempty"`
 	TeamPostHome  *string `json:"team_post_home,omitempty"`
@@ -549,6 +550,8 @@ func GetMatches(w http.ResponseWriter, r *http.Request) {
 		if match.Status == "" {
 			match.Status = "ADD"
 		}
+		// เพิ่มเติม: ให้ match.MatchStatus = match.Status เพื่อให้ JS ใช้ได้
+		match.MatchStatus = match.Status
 		matches = append(matches, match)
 	}
 

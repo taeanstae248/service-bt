@@ -33,7 +33,7 @@ function fetchMatches(dateParam) {
                     table.innerHTML = `
                         <thead>
                             <tr>
-                                <th>เวลาแข่งขัน</th>
+                                <th>เวลาแข่งขัน</th>                                
                                 <th class="home-team">ทีมเหย้า</th>
                                 <th class="score-center">สกอร์</th>
                                 <th>ทีมเยือน</th>
@@ -60,7 +60,7 @@ function fetchMatches(dateParam) {
                         }
                         tbody.innerHTML += `
                             <tr>
-                                <td>${timeStr}</td>
+                                <td>${timeStr}  ${match.match_status || ''}</td>
                                 <td class="home-team">${match.home_team || ''}</td>
                                 <td class="score-center">${match.home_score ?? ''} - ${match.away_score ?? ''}</td>
                                 <td>${match.away_team || ''}</td>
