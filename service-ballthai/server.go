@@ -59,6 +59,8 @@ func main() {
 	router.HandleFunc("/api/stages", handlers.GetStages).Methods("GET")
 	router.HandleFunc("/api/teams/search", handlers.SearchTeams).Methods("GET")
 	router.HandleFunc("/api/teams", handlers.CreateTeam).Methods("POST")
+	// Standings API
+	router.HandleFunc("/api/standings", handlers.GetStandings).Methods("GET")
 	router.HandleFunc("/api/teams/{id}", handlers.GetTeamByID).Methods("GET")
 	router.HandleFunc("/api/teams/{id}", handlers.UpdateTeam).Methods("PUT")
 	router.HandleFunc("/api/teams/{id}", handlers.DeleteTeam).Methods("DELETE")
@@ -72,6 +74,7 @@ func main() {
 	router.HandleFunc("/api/channels", handlers.GetChannels).Methods("GET")
 	// เพิ่ม route สำหรับ scraper
 	router.HandleFunc("/scraper/matches", handlers.ScrapeMatchesHandler).Methods("GET")
+	router.HandleFunc("/scraper/standing", handlers.ScrapeStandingsHandler).Methods("GET")
 
 	// Player routes
 	router.HandleFunc("/api/players", handlers.GetPlayers).Methods("GET")

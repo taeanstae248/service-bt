@@ -3,15 +3,31 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"go-ballthai-scraper/models"
 	"log"
-
-	"go-ballthai-scraper/models" // ตรวจสอบให้แน่ใจว่าชื่อโมดูลตรงกับ go.mod ของคุณ
 )
+
+// GetStandingsByLeagueID คืน standings ทั้งหมดของลีกที่ระบุ
+func GetStandingsByLeagueID(db *sql.DB, leagueID int) ([]models.StandingDB, error) {
+	rows, err := db.Query(`SELECT id, league_id, team_id, round, matches_played, wins, draws, losses, goals_for, goals_against, goal_difference, points, current_rank FROM standings WHERE league_id = ? ORDER BY points DESC, goal_difference DESC, wins DESC`, leagueID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var standings []models.StandingDB
+	for rows.Next() {
+		var s models.StandingDB
+		if err := rows.Scan(&s.ID, &s.LeagueID, &s.TeamID, &s.Round, &s.MatchesPlayed, &s.Wins, &s.Draws, &s.Losses, &s.GoalsFor, &s.GoalsAgainst, &s.GoalDifference, &s.Points, &s.CurrentRank); err != nil {
+			return nil, err
+		}
+		standings = append(standings, s)
+	}
+	return standings, nil
+}
 
 // InsertOrUpdateStanding inserts or updates a league standing record in the database
 func InsertOrUpdateStanding(db *sql.DB, standing models.StandingDB) error {
 	var existingStandingID int
-	// Check for existing record based on league_id and team_id (UNIQUE constraint)
 	query := "SELECT id FROM standings WHERE league_id = ? AND team_id = ?"
 	err := db.QueryRow(query, standing.LeagueID, standing.TeamID).Scan(&existingStandingID)
 
