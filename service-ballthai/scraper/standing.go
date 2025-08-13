@@ -37,16 +37,8 @@ func ScrapeStandings(db *sql.DB) error {
 			continue
 		}
 
-		// การจัดการพิเศษสำหรับ T3 (SOUTH stage) ตามที่เห็นใน PHP
-		if config.IsT3 {
-			filteredResponse := []models.StandingAPI{}
-			for _, s := range apiResponse {
-				if s.StageName == "SOUTH" {
-					filteredResponse = append(filteredResponse, s)
-				}
-			}
-			apiResponse = filteredResponse
-		}
+			   // เดิม: filter เฉพาะ SOUTH สำหรับ T3
+			   // ใหม่: ไม่ filter ใดๆ เพื่อเก็บ standings ทุกโซนของ T3
 
 		for _, apiStanding := range apiResponse {
 			// รับ Team ID
@@ -63,22 +55,29 @@ func ScrapeStandings(db *sql.DB) error {
 				continue
 			}
 
-			// เตรียมโครงสร้าง StandingDB
-			standingDB := models.StandingDB{
-				LeagueID:       config.LeagueID,
-				TeamID:         teamID,
-				MatchesPlayed:  apiStanding.MatchPlay,
-				Wins:           apiStanding.Win,
-				Draws:          apiStanding.Draw,
-				Losses:         apiStanding.Lose,
-				GoalsFor:       apiStanding.GoalFor,
-				GoalsAgainst:   apiStanding.GoalAgainst,
-				GoalDifference: apiStanding.GoalDifference,
-				Points:         apiStanding.Point,
-				CurrentRank:    sql.NullInt64{Int64: int64(apiStanding.CurrentRank), Valid: apiStanding.CurrentRank != 0},
-				// Round มักจะไม่ได้อยู่ใน Standing API โดยตรง อาจต้องถูกดึงมาหรือตั้งค่าเป็น NULL
-				Round:          sql.NullInt64{Valid: false}, // ค่าเริ่มต้นเป็น null หากไม่พร้อมใช้งาน
-			}
+			   // หา stage_id จาก stage_name (ถ้าไม่มีจะ insert ให้)
+			   stageID := sql.NullInt64{Valid: false}
+			   if apiStanding.StageName != "" {
+				   id, err := database.GetStageID(db, apiStanding.StageName, config.LeagueID)
+				   if err == nil {
+					   stageID = sql.NullInt64{Int64: int64(id), Valid: true}
+				   }
+			   }
+			   standingDB := models.StandingDB{
+				   LeagueID:       config.LeagueID,
+				   TeamID:         teamID,
+				   MatchesPlayed:  apiStanding.MatchPlay,
+				   Wins:           apiStanding.Win,
+				   Draws:          apiStanding.Draw,
+				   Losses:         apiStanding.Lose,
+				   GoalsFor:       apiStanding.GoalFor,
+				   GoalsAgainst:   apiStanding.GoalAgainst,
+				   GoalDifference: apiStanding.GoalDifference,
+				   Points:         apiStanding.Point,
+				   CurrentRank:    sql.NullInt64{Int64: int64(apiStanding.CurrentRank), Valid: apiStanding.CurrentRank != 0},
+				   Round:          sql.NullInt64{Valid: false},
+				   StageID:        stageID,
+			   }
 
 			// แทรกหรืออัปเดตตารางคะแนนใน DB
 			err = database.InsertOrUpdateStanding(db, standingDB)
