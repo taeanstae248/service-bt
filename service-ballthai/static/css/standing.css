@@ -1,0 +1,12 @@
+body { background: #f8f9fa; }
+.container {
+	max-width: 1200px;
+	margin: 2rem auto;
+	background: #fff;
+	border-radius: 8px;
+	box-shadow: 0 2px 8px #0001;
+	padding: 0 2rem;
+}
+.standings-table th, .standings-table td { text-align: center; }
+.move-btn { cursor: pointer; padding: 2px 8px; }
+.move-btn:disabled { opacity: 0.5; cursor: not-allowed; }
