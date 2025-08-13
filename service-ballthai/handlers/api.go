@@ -82,6 +82,29 @@ type Player struct {
 	PreferredFoot *string `json:"preferred_foot,omitempty"`
 }
 
+// DeleteMatch handles DELETE /api/matches/{id}
+func DeleteMatch(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	vars := mux.Vars(r)
+	idStr := vars["id"]
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, `{"success": false, "error": "Invalid match id"}`, http.StatusBadRequest)
+		return
+	}
+	res, err := DB.Exec("DELETE FROM matches WHERE id = ?", id)
+	if err != nil {
+		http.Error(w, `{"success": false, "error": "Failed to delete match"}`, http.StatusInternalServerError)
+		return
+	}
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		http.Error(w, `{"success": false, "error": "Match not found"}`, http.StatusNotFound)
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
+}
+
 // UpdateMatch handles PUT /api/matches/{id}
 func UpdateMatch(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")

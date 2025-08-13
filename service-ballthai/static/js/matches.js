@@ -321,7 +321,18 @@ function editMatch(id) {
 }
 function deleteMatch(id) {
     if (confirm('ต้องการลบแมทช์นี้ใช่หรือไม่?')) {
-        alert('ฟังก์ชันลบแมทช์ (Demo) ID: ' + id);
+        fetch(`/api/matches/${id}`, {
+            method: 'DELETE',
+        })
+        .then(res => res.json())
+        .then(result => {
+            if (result.success) {
+                fetchMatches();
+            } else {
+                alert(result.error || 'เกิดข้อผิดพลาดในการลบแมทช์');
+            }
+        })
+        .catch(() => alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์'));
     }
 }
 window.onload = function() {
