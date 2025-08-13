@@ -109,7 +109,6 @@ CREATE TABLE IF NOT EXISTS `standings` (
     `id` INT PRIMARY KEY AUTO_INCREMENT,
     `league_id` INT NOT NULL,           -- Foreign Key อ้างอิงไปยังตาราง leagues
     `team_id` INT NOT NULL,             -- Foreign Key อ้างอิงไปยังตาราง teams
-    `round` INT,                        -- รอบการแข่งขัน (ถ้ามี)
     `stage_id` INT,                     -- เพิ่ม: FK ไปตาราง stage
     `matches_played` INT DEFAULT 0,     -- จำนวนนัดที่ลงแข่ง
     `wins` INT DEFAULT 0,               -- จำนวนนัดที่ชนะ
@@ -120,6 +119,7 @@ CREATE TABLE IF NOT EXISTS `standings` (
     `goal_difference` INT DEFAULT 0,    -- ผลต่างประตูได้เสีย
     `points` INT DEFAULT 0,             -- คะแนนรวม
     `current_rank` INT,                 -- อันดับปัจจุบัน
+    `status` INT,                        -- รอบการแข่งขัน (ถ้ามี)
     UNIQUE (`league_id`, `team_id`, `stage_id`), -- กำหนดให้แต่ละทีมมีข้อมูลคะแนนเดียวในแต่ละลีกและสเตจ
     FOREIGN KEY (`league_id`) REFERENCES `leagues`(`id`),
     FOREIGN KEY (`team_id`) REFERENCES `teams`(`id`)
