@@ -66,6 +66,8 @@ func main() {
 	router.HandleFunc("/api/stadiums", handlers.GetStadiums).Methods("GET")
 	router.HandleFunc("/api/matches", handlers.GetMatches).Methods("GET")
 	router.HandleFunc("/api/matches", handlers.CreateMatch).Methods("POST")
+	router.HandleFunc("/api/matches/{id}", handlers.GetMatchByID).Methods("GET")
+	router.HandleFunc("/api/matches/{id}", handlers.UpdateMatch).Methods("PUT")
 	router.HandleFunc("/api/channels", handlers.GetChannels).Methods("GET")
 	// เพิ่ม route สำหรับ scraper
 	router.HandleFunc("/scraper/matches", handlers.ScrapeMatchesHandler).Methods("GET")

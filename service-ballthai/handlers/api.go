@@ -1,3 +1,12 @@
+// UpdateMatch handles PUT /api/matches/{id}
+
+// ...existing code...
+
+// UpdateMatch handles PUT /api/matches/{id}
+
+// ...existing code...
+
+// GetMatchByID handles GET /api/matches/{id}
 package handlers
 
 import (
@@ -21,11 +30,11 @@ type League struct {
 type Team struct {
 	ID              int     `json:"id"`
 	NameTh          string  `json:"name_th"`
-	TeamPostID      *int    `json:"team_post_id,omitempty"`
 	StadiumID       *int    `json:"stadium_id,omitempty"`
 	StadiumName     *string `json:"stadium_name,omitempty"`
 	Logo            *string `json:"logo,omitempty"`
 	EstablishedYear *int    `json:"established_year,omitempty"`
+	TeamPostID      *int    `json:"team_post_id,omitempty"`
 }
 
 type Stadium struct {
@@ -71,6 +80,130 @@ type Player struct {
 	PlaceOfBirth  *string `json:"place_of_birth,omitempty"`
 	CareerStart   *int    `json:"career_start,omitempty"`
 	PreferredFoot *string `json:"preferred_foot,omitempty"`
+}
+
+// UpdateMatch handles PUT /api/matches/{id}
+func UpdateMatch(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	vars := mux.Vars(r)
+	idStr := vars["id"]
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, `{"success": false, "error": "Invalid match id"}`, http.StatusBadRequest)
+		return
+	}
+	var req struct {
+		LeagueID      int    `json:"league_id"`
+		StageID       *int   `json:"stage_id"`
+		StartDate     string `json:"start_date"`
+		StartTime     string `json:"start_time"`
+		HomeTeamID    int    `json:"home_team_id"`
+		AwayTeamID    int    `json:"away_team_id"`
+		HomeScore     int    `json:"home_score"`
+		AwayScore     int    `json:"away_score"`
+		MatchStatus   string `json:"match_status"`
+		ChannelID     *int   `json:"channel_id"`
+		LiveChannelID *int   `json:"live_channel_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"success": false, "error": "Invalid request body"}`, http.StatusBadRequest)
+		return
+	}
+	query := `UPDATE matches SET
+		league_id = ?,
+		stage_id = ?,
+		start_date = ?,
+		start_time = ?,
+		home_team_id = ?,
+		away_team_id = ?,
+		home_score = ?,
+		away_score = ?,
+		match_status = ?,
+		channel_id = ?,
+		live_channel_id = ?
+		WHERE id = ?`
+	_, err = DB.Exec(query,
+		req.LeagueID, req.StageID, req.StartDate, req.StartTime,
+		req.HomeTeamID, req.AwayTeamID, req.HomeScore, req.AwayScore,
+		req.MatchStatus, req.ChannelID, req.LiveChannelID, id,
+	)
+	if err != nil {
+		http.Error(w, `{"success": false, "error": "Failed to update match"}`, http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
+}
+
+// GetMatchByID handles GET /api/matches/{id}
+func GetMatchByID(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	vars := mux.Vars(r)
+	idStr := vars["id"]
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, `{"success": false, "error": "Invalid match id"}`, http.StatusBadRequest)
+		return
+	}
+	query := `
+		SELECT m.id, m.league_id, m.stage_id, m.start_date, m.start_time,
+			   m.home_team_id, m.away_team_id, m.home_score, m.away_score,
+			   m.match_status, m.channel_id, m.live_channel_id,
+			   ht.name_th as home_team, at.name_th as away_team,
+			   s.name as stadium, l.name as league_name,
+			   ht.team_post_ballthai as team_post_home, at.team_post_ballthai as team_post_away
+		FROM matches m
+		LEFT JOIN teams ht ON m.home_team_id = ht.id
+		LEFT JOIN teams at ON m.away_team_id = at.id
+		LEFT JOIN stadiums s ON ht.stadium_id = s.id
+		LEFT JOIN leagues l ON m.league_id = l.id
+		WHERE m.id = ?
+		LIMIT 1
+	`
+	var resp struct {
+		ID            int     `json:"id"`
+		LeagueID      *int    `json:"league_id"`
+		StageID       *int    `json:"stage_id"`
+		StartDate     string  `json:"start_date"`
+		StartTime     *string `json:"start_time"`
+		HomeTeamID    *int    `json:"home_team_id"`
+		AwayTeamID    *int    `json:"away_team_id"`
+		HomeScore     *int    `json:"home_score"`
+		AwayScore     *int    `json:"away_score"`
+		MatchStatus   string  `json:"match_status"`
+		ChannelID     *int    `json:"channel_id"`
+		LiveChannelID *int    `json:"live_channel_id"`
+		HomeTeam      string  `json:"home_team"`
+		AwayTeam      string  `json:"away_team"`
+		Stadium       *string `json:"stadium"`
+		LeagueName    *string `json:"league_name"`
+		TeamPostHome  *string `json:"team_post_home"`
+		TeamPostAway  *string `json:"team_post_away"`
+	}
+	row := DB.QueryRow(query, id)
+	err = row.Scan(&resp.ID, &resp.LeagueID, &resp.StageID, &resp.StartDate, &resp.StartTime,
+		&resp.HomeTeamID, &resp.AwayTeamID, &resp.HomeScore, &resp.AwayScore,
+		&resp.MatchStatus, &resp.ChannelID, &resp.LiveChannelID,
+		&resp.HomeTeam, &resp.AwayTeam, &resp.Stadium, &resp.LeagueName,
+		&resp.TeamPostHome, &resp.TeamPostAway)
+	if err == sql.ErrNoRows {
+		http.Error(w, `{"success": false, "error": "Match not found"}`, http.StatusNotFound)
+		return
+	} else if err != nil {
+		http.Error(w, `{"success": false, "error": "Database error"}`, http.StatusInternalServerError)
+		return
+	}
+	if resp.TeamPostAway == nil || *resp.TeamPostAway == "" {
+		zero := "0"
+		resp.TeamPostAway = &zero
+	}
+	if resp.MatchStatus == "" {
+		resp.MatchStatus = "ADD"
+	}
+	response := APIResponse{
+		Success: true,
+		Data:    resp,
+	}
+	json.NewEncoder(w).Encode(response)
 }
 
 var DB *sql.DB

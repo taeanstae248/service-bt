@@ -2,17 +2,14 @@ package main
 
 import (
 	"database/sql"
-	"go-ballthai-scraper/api" // Import the api package
-	"go-ballthai-scraper/models"
+	"go-ballthai-scraper/handlers"
 	"log"
 	"net/http"
 	"os"
 
 	_ "github.com/go-sql-driver/mysql" // Driver สำหรับ MySQL
-	"github.com/joho/godotenv"         // สำหรับโหลด .env
-	// Import database package
-	// Import handlers package
-	// Import middleware package
+	"github.com/gorilla/mux"
+	"github.com/joho/godotenv" // สำหรับโหลด .env
 )
 
 var db *sql.DB // ตัวแปร Global สำหรับเก็บ Connection ฐานข้อมูล
@@ -62,59 +59,22 @@ func main() {
 	log.Println("Database connection successful!")
 	log.Println("Successfully connected to the database!")
 
-	// Check for command line arguments
-	if len(os.Args) > 1 {
-		switch os.Args[1] {
-		case "api":
-			log.Println("Starting API server mode...")
-			startAPIServer()
-		default:
-			log.Printf("Unknown command: %s", os.Args[1])
-			log.Println("Available commands: api")
-		}
-	} else {
-		// Default behavior: start API server
-		log.Println("No command specified. Starting API server...")
-		startAPIServer()
-	}
+	r := mux.NewRouter()
 
-	http.HandleFunc("/api/matches", models.MatchCreateHandler(db))
+	// Register match routes (ลำดับสำคัญ: /api/matches/{id:[0-9]+} ต้องมาก่อน /api/matches)
+	r.HandleFunc("/api/matches/{id:[0-9]+}", handlers.MatchGetByIDHandler(db)).Methods("GET")
+	r.HandleFunc("/api/matches/{id:[0-9]+}", handlers.MatchUpdateHandler(db)).Methods("PUT")
+	r.HandleFunc("/api/matches/{id:[0-9]+}", handlers.MatchDeleteHandler(db)).Methods("DELETE")
+	r.HandleFunc("/api/matches", handlers.MatchListHandler(db)).Methods("GET")
+	r.HandleFunc("/api/matches", handlers.MatchCreateHandler(db)).Methods("POST")
 
-	log.Println("Listening on :8080") // เพิ่ม log ตรงนี้
-	http.ListenAndServe(":8080", nil)
-}
+	// เพิ่ม NotFoundHandler เพื่อ debug
+	r.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"success":false,"error":"route not found","path":"` + req.URL.Path + `"}`))
+	})
 
-// startAPIServer starts the REST API server
-func startAPIServer() {
-	// Create handler with database connection
-	handler := api.NewHandler(db)
-	mux := handler.SetupRoutes()
-
-	// Get port from environment or use default
-	port := os.Getenv("API_PORT")
-	if port == "" {
-		port = "8080"
-	}
-
-	log.Printf("🚀 Starting API server on port %s...", port)
-	log.Printf("📊 API Endpoints available:")
-	log.Printf("   • GET /api/leagues        - All leagues")
-	log.Printf("   • GET /api/teams          - All teams")
-	log.Printf("   • GET /api/teams/{id}     - Specific team")
-	log.Printf("   • GET /api/stadiums       - All stadiums")
-	log.Printf("   • GET /api/players        - All players (with filtering: ?team_id=X, ?league_id=X, ?position=GK)")
-	log.Printf("   • GET /api/matches        - Matches (upcoming and past)")
-	log.Printf("   • GET /api/matches?league_id=1 - Matches by league ID")
-	log.Printf("   • GET /api/matches?league=t1 - Matches by league name (t1, t2, t3, fa, lc, youth, cl, afc)")
-	log.Printf("   • GET /api/standings      - League standings")
-	log.Printf("   • GET /api/standings?league=t1 - Standings by league (t1, t2, t3, fa, lc)")
-	log.Printf("   • POST /api/scrape/jleague-standings - Scrape J-League standings")
-	log.Printf("   • GET /images/{path}      - Static images")
-	log.Printf("")
-	log.Printf("🌐 API Server running at: http://localhost:%s", port)
-
-	// Start server
-	if err := http.ListenAndServe(":"+port, mux); err != nil {
-		log.Fatal("Failed to start server:", err)
-	}
+	log.Println("Listening on :8080")
+	http.ListenAndServe(":8080", r)
 }

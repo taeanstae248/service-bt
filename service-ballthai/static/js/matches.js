@@ -156,16 +156,10 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             console.log('submit event fired'); // เพิ่ม log ตรงนี้
             const formData = new FormData(addMatchForm);
-            let stageValue = formData.get('stage_name');
-            let stage_id = null;
-            if (stageValue && stageValue !== "null" && stageValue !== "") {
-                stage_id = Number(stageValue);
-            } else {
-                stage_id = null;
-            }
+            // ...existing code เตรียม payload...
             const payload = {
                 league_id: Number(formData.get('league_id')),
-                stage_id: stage_id,
+                stage_id: formData.get('stage_name') ? Number(formData.get('stage_name')) : null,
                 start_date: formData.get('start_date'),
                 start_time: formData.get('start_time'),
                 home_team_id: Number(formData.get('home_team_id')),
@@ -180,8 +174,18 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('live_channel_id', formData.get('live_channel_id'));
             console.log('payload', payload);
             console.log('about to fetch POST /api/matches'); // เพิ่ม log ตรงนี้
-            fetch('/api/matches', {
-                method: 'POST',
+            // เช็คโหมด add/edit
+            const mode = addMatchForm.getAttribute('data-mode');
+            let url = '/api/matches';
+            let method = 'POST';
+            let idInput = document.getElementById('match_id');
+            if (mode === 'edit' && idInput && idInput.value) {
+                url = `/api/matches/${idInput.value}`;
+                method = 'PUT';
+            }
+
+            fetch(url, {
+                method: method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             })
@@ -192,18 +196,128 @@ document.addEventListener('DOMContentLoaded', function() {
                     closeAddMatchModal();
                     fetchMatches();
                 } else {
-                    alert('เกิดข้อผิดพลาดในการเพิ่มแมทช์');
+                    alert('เกิดข้อผิดพลาดในการบันทึกแมทช์');
                 }
             })
-            .catch((err) => {
-                console.error('fetch error', err); // เพิ่ม log ตรงนี้
-                alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
-            });
+            .catch(() => alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์'));
         });
     }
 });
 function editMatch(id) {
-    alert('ฟังก์ชันแก้ไขแมทช์ (Demo) ID: ' + id);
+    // ดึงข้อมูลแมทช์จาก API
+    fetch(`/api/matches/${id}`)
+        .then(res => {
+            if (!res.ok) {
+                res.text().then(txt => {
+                    console.error('API error:', res.status, txt);
+                });
+                alert('ไม่พบข้อมูลแมทช์ หรือ API มีปัญหา');
+                return Promise.reject();
+            }
+            return res.json();
+        })
+        .then(result => {
+            if (!result || !result.success || !result.data) return;
+            const match = result.data;
+            document.getElementById('addMatchModal').style.display = 'flex';
+            // โหลด option ทั้งหมด แล้วค่อย set value
+            Promise.all([
+                fetch('/api/leagues').then(res => res.json()),
+                fetch('/api/stages').then(res => res.json()),
+                fetch('/api/teams').then(res => res.json()),
+                fetch('/api/channels').then(res => res.json())
+            ]).then(([leaguesData, stagesData, teamsData, channelsData]) => {
+                // leagues
+                const leagueSelect = document.getElementById('league_select');
+                leagueSelect.innerHTML = '<option value="">-- เลือกลีก --</option>';
+                if (leaguesData.success && Array.isArray(leaguesData.data)) {
+                    leaguesData.data.forEach(lg => {
+                        leagueSelect.innerHTML += `<option value="${lg.id}">${lg.name}</option>`;
+                    });
+                }
+                // stages
+                const stageSelect = document.getElementById('stage_name_select');
+                stageSelect.innerHTML = '<option value="">-- เลือกประเภทการแข่งขัน --</option>';
+                stageSelect.innerHTML += '<option value="0">(ไม่ระบุประเภทการแข่งขัน)</option>';
+                if (stagesData.success && Array.isArray(stagesData.data) && stagesData.data.length > 0) {
+                    stagesData.data.forEach(stage => {
+                        if (stage.stage_name && stage.id) {
+                            stageSelect.innerHTML += `<option value="${stage.id}">${stage.stage_name}</option>`;
+                        }
+                    });
+                }
+                // teams
+                const homeTeamSelect = document.getElementById('home_team_select');
+                const awayTeamSelect = document.getElementById('away_team_select');
+                homeTeamSelect.innerHTML = '<option value="">-- เลือกทีมเหย้า --</option>';
+                awayTeamSelect.innerHTML = '<option value="">-- เลือกทีมเยือน --</option>';
+                if (teamsData.success && Array.isArray(teamsData.data)) {
+                    teamsData.data.forEach(team => {
+                        homeTeamSelect.innerHTML += `<option value="${team.id}">${team.name_th}</option>`;
+                        awayTeamSelect.innerHTML += `<option value="${team.id}">${team.name_th}</option>`;
+                    });
+                }
+                // channels
+                const channelSelect = document.getElementById('channel_select');
+                const liveChannelSelect = document.getElementById('live_channel_select');
+                channelSelect.innerHTML = '<option value="">-- เลือกช่องทีวี --</option>';
+                liveChannelSelect.innerHTML = '<option value="">-- เลือกช่องถ่ายทอดสด --</option>';
+                if (channelsData.success && Array.isArray(channelsData.data)) {
+                    channelsData.data.forEach(ch => {
+                        if (ch.type === 'TV') {
+                            channelSelect.innerHTML += `<option value="${ch.id}">${ch.name}</option>`;
+                        } else {
+                            liveChannelSelect.innerHTML += `<option value="${ch.id}">${ch.name}</option>`;
+                        }
+                    });
+                }
+                // set value หลังเติม option
+                leagueSelect.value = match.league_id || '';
+                stageSelect.value = match.stage_id || '';
+                // แปลง start_date เป็น YYYY-MM-DD
+                let dateVal = '';
+                if (match.start_date) {
+                    // รองรับทั้ง YYYY-MM-DD และ YYYY-MM-DDTHH:mm:ssZ
+                    const d = new Date(match.start_date);
+                    if (!isNaN(d.getTime())) {
+                        const yyyy = d.getFullYear();
+                        const mm = String(d.getMonth() + 1).padStart(2, '0');
+                        const dd = String(d.getDate()).padStart(2, '0');
+                        dateVal = `${yyyy}-${mm}-${dd}`;
+                    } else if (/^\d{4}-\d{2}-\d{2}/.test(match.start_date)) {
+                        dateVal = match.start_date.substring(0, 10);
+                    }
+                }
+                document.getElementById('start_date').value = dateVal;
+                document.getElementById('start_time').value = match.start_time || '';
+                homeTeamSelect.value = match.home_team_id || '';
+                awayTeamSelect.value = match.away_team_id || '';
+                // ตรวจสอบและ set channel_id, live_channel_id ให้ตรงกับ option
+                const chVal = match.channel_id != null ? String(match.channel_id) : '';
+                const liveChVal = match.live_channel_id != null ? String(match.live_channel_id) : '';
+                channelSelect.value = chVal;
+                liveChannelSelect.value = liveChVal;
+                document.getElementById('home_score').value = match.home_score ?? 0;
+                document.getElementById('away_score').value = match.away_score ?? 0;
+                document.getElementById('match_status_select').value = match.match_status || 'ADD';
+                // เพิ่ม hidden input สำหรับ id
+                let idInput = document.getElementById('match_id');
+                if (!idInput) {
+                    idInput = document.createElement('input');
+                    idInput.type = 'hidden';
+                    idInput.id = 'match_id';
+                    idInput.name = 'id';
+                    document.getElementById('addMatchForm').appendChild(idInput);
+                }
+                idInput.value = match.id;
+                document.getElementById('addMatchForm').setAttribute('data-mode', 'edit');
+            });
+        })
+        .catch(err => {
+            if (err) {
+                alert(err.message || 'ไม่พบข้อมูลแมทช์');
+            }
+        });
 }
 function deleteMatch(id) {
     if (confirm('ต้องการลบแมทช์นี้ใช่หรือไม่?')) {
