@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"go-ballthai-scraper/api" // Import the api package
+	"go-ballthai-scraper/models"
 	"log"
 	"net/http"
 	"os"
@@ -17,6 +18,8 @@ import (
 var db *sql.DB // ตัวแปร Global สำหรับเก็บ Connection ฐานข้อมูล
 
 func main() {
+	log.Println("BallThai service starting...") // เพิ่ม log ตรงนี้
+
 	// Load values from .env file
 	log.Println("Attempting to load .env file...")
 	err := godotenv.Load()
@@ -74,6 +77,11 @@ func main() {
 		log.Println("No command specified. Starting API server...")
 		startAPIServer()
 	}
+
+	http.HandleFunc("/api/matches", models.MatchCreateHandler(db))
+
+	log.Println("Listening on :8080") // เพิ่ม log ตรงนี้
+	http.ListenAndServe(":8080", nil)
 }
 
 // startAPIServer starts the REST API server

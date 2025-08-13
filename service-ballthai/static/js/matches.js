@@ -145,7 +145,7 @@ function addMatch() {
     document.getElementById('addMatchModal').style.display = 'flex';
 }
 
-function closeAddMatchModal() {
+window.closeAddMatchModal = function() {
     document.getElementById('addMatchModal').style.display = 'none';
 }
 
@@ -154,6 +154,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (addMatchForm) {
         addMatchForm.addEventListener('submit', function(e) {
             e.preventDefault();
+            console.log('submit event fired'); // เพิ่ม log ตรงนี้
             const formData = new FormData(addMatchForm);
             let stageValue = formData.get('stage_name');
             let stage_id = null;
@@ -171,8 +172,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 away_team_id: Number(formData.get('away_team_id')),
                 home_score: formData.get('home_score') ? Number(formData.get('home_score')) : null,
                 away_score: formData.get('away_score') ? Number(formData.get('away_score')) : null,
-                match_status: formData.get('match_status')
+                match_status: formData.get('match_status'),
+                channel_id: formData.get('channel_id') ? Number(formData.get('channel_id')) : null,
+                live_channel_id: formData.get('live_channel_id') ? Number(formData.get('live_channel_id')) : null
             };
+            console.log('channel_id', formData.get('channel_id'));
+            console.log('live_channel_id', formData.get('live_channel_id'));
+            console.log('payload', payload);
+            console.log('about to fetch POST /api/matches'); // เพิ่ม log ตรงนี้
             fetch('/api/matches', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -180,6 +187,7 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .then(res => res.json())
             .then(result => {
+                console.log('POST /api/matches result', result); // เพิ่ม log ตรงนี้
                 if (result.success) {
                     closeAddMatchModal();
                     fetchMatches();
@@ -187,7 +195,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     alert('เกิดข้อผิดพลาดในการเพิ่มแมทช์');
                 }
             })
-            .catch(() => alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์'));
+            .catch((err) => {
+                console.error('fetch error', err); // เพิ่ม log ตรงนี้
+                alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+            });
         });
     }
 });

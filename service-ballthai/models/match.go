@@ -1,6 +1,11 @@
 package models
 
-import "database/sql"
+import (
+	"database/sql"
+	"encoding/json"
+	"log"
+	"net/http"
+)
 
 // MatchAPI represents the structure of match data from the API
 type MatchAPI struct {
@@ -41,4 +46,63 @@ type MatchDB struct {
 	HomeScore     sql.NullInt64
 	AwayScore     sql.NullInt64
 	MatchStatus   sql.NullString
+}
+
+// MatchInsertRequest represents the structure for inserting a new match
+type MatchInsertRequest struct {
+	LeagueID      int    `json:"league_id"`
+	StageID       int    `json:"stage_id"`
+	StartDate     string `json:"start_date"`
+	StartTime     string `json:"start_time"`
+	HomeTeamID    int    `json:"home_team_id"`
+	AwayTeamID    int    `json:"away_team_id"`
+	HomeScore     *int   `json:"home_score"`
+	AwayScore     *int   `json:"away_score"`
+	MatchStatus   string `json:"match_status"`
+	ChannelID     *int   `json:"channel_id"`
+	LiveChannelID *int   `json:"live_channel_id"`
+}
+
+// InsertMatch inserts a new match into the database
+func InsertMatch(db *sql.DB, req MatchInsertRequest) error {
+	log.Printf("InsertMatch payload: %+v\n", req)
+	sqlStr := `
+		INSERT INTO matches (
+			league_id, stage_id, start_date, start_time,
+			home_team_id, away_team_id, home_score, away_score,
+			match_status, channel_id, live_channel_id
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`
+	args := []interface{}{
+		req.LeagueID, req.StageID, req.StartDate, req.StartTime,
+		req.HomeTeamID, req.AwayTeamID, req.HomeScore, req.AwayScore,
+		req.MatchStatus, req.ChannelID, req.LiveChannelID,
+	}
+	log.Printf("InsertMatch args: %+v\n", args)
+	res, err := db.Exec(sqlStr, args...)
+	if err != nil {
+		log.Printf("InsertMatch error: %v\n", err)
+	} else {
+		id, _ := res.LastInsertId()
+		log.Printf("InsertMatch success, inserted id: %d\n", id)
+	}
+	return err
+}
+
+// Handler ควรรับ db *sql.DB เป็น argument
+func MatchCreateHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req MatchInsertRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
+		log.Printf("Handler decoded req: %+v\n", req)
+		if err := InsertMatch(db, req); err != nil {
+			log.Printf("Handler InsertMatch error: %v\n", err)
+			http.Error(w, "Insert failed: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Write([]byte(`{"success":true}`))
+	}
 }
