@@ -3,19 +3,18 @@ package handlers
 import (
 	"encoding/json"
 	"go-ballthai-scraper/database"
+	"go-ballthai-scraper/models"
 	"net/http"
 	"strconv"
+	"database/sql"
 )
 
 // UpdateStanding อัปเดตข้อมูล standings ตาม id
 func UpdateStanding(w http.ResponseWriter, r *http.Request) {
-	// log เพื่อตรวจสอบว่า handler ถูกเรียก
 	println("[DEBUG] UpdateStanding called for path:", r.URL.Path)
 	w.Header().Set("Content-Type", "application/json")
 	idStr := ""
-	// รองรับทั้ง mux.Vars และ query param (กรณีใช้ mux)
 	if r.URL.Path != "" {
-		// /api/standings/{id}
 		parts := splitPath(r.URL.Path)
 		if len(parts) > 0 {
 			idStr = parts[len(parts)-1]
@@ -35,14 +34,75 @@ func UpdateStanding(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"success": false, "error": "invalid json"}`, http.StatusBadRequest)
 		return
 	}
-	// TODO: update standing in DB (mock)
-	// คุณควรเขียนฟังก์ชัน database.UpdateStandingByID(id, req) จริงในภายหลัง
+
+	// Map json -> StandingDB (handle sql.NullInt64)
+	standing := models.StandingDB{ID: id}
+	if v, ok := req["matches_played"]; ok { standing.MatchesPlayed, _ = toInt(v) }
+	if v, ok := req["wins"]; ok { standing.Wins, _ = toInt(v) }
+	if v, ok := req["draws"]; ok { standing.Draws, _ = toInt(v) }
+	if v, ok := req["losses"]; ok { standing.Losses, _ = toInt(v) }
+	if v, ok := req["goals_for"]; ok { standing.GoalsFor, _ = toInt(v) }
+	if v, ok := req["goals_against"]; ok { standing.GoalsAgainst, _ = toInt(v) }
+	if v, ok := req["goal_difference"]; ok { standing.GoalDifference, _ = toInt(v) }
+	if v, ok := req["points"]; ok { standing.Points, _ = toInt(v) }
+	if v, ok := req["current_rank"]; ok {
+		i, _ := toInt64(v)
+		standing.CurrentRank = sqlNullInt64(i)
+	}
+		if v, ok := req["status"]; ok { 
+			i, _ := toInt64(v) 
+			standing.Status = sqlNullInt64(i) 
+		} else { 
+			standing.Status = sqlNullInt64(0) // default OFF 
+		}
+
+	err = database.UpdateStandingByID(database.DB, id, standing)
+	if err != nil {
+		println("[ERROR] UpdateStandingByID:", err.Error())
+		http.Error(w, `{"success": false, "error": "failed to update standing"}`, http.StatusInternalServerError)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"id":      id,
-		"data":    req,
+		"data":    standing,
 	})
+}
+
+// toInt helper
+func toInt(v interface{}) (int, bool) {
+	switch val := v.(type) {
+	case float64:
+		return int(val), true
+	case int:
+		return val, true
+	case int64:
+		return int(val), true
+	case string:
+		i, err := strconv.Atoi(val)
+		if err == nil { return i, true }
+	}
+	return 0, false
+}
+func toInt64(v interface{}) (int64, bool) {
+	switch val := v.(type) {
+	case float64:
+		return int64(val), true
+	case int:
+		return int64(val), true
+	case int64:
+		return val, true
+	case string:
+		i, err := strconv.ParseInt(val, 10, 64)
+		if err == nil { return i, true }
+	}
+	return 0, false
+}
+func sqlNullInt64(i int64) (n sql.NullInt64) {
+	n.Int64 = i
+	n.Valid = true
+	return
 }
 
 // splitPath แยก path เป็น slice (เช่น /api/standings/16 -> ["api","standings","16"])

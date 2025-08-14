@@ -129,6 +129,8 @@ async function saveOrder() {
 }
 // Modal ฟอร์มแก้ไข standings
 function showEditStandingModal(standing) {
+    // DEBUG: log standing object
+    console.log('DEBUG standing in modal:', standing);
     // ลบ modal เดิมถ้ามี
     const oldModal = document.getElementById('editStandingModal');
     if (oldModal) oldModal.remove();
@@ -151,8 +153,8 @@ function showEditStandingModal(standing) {
             <label>อันดับ: <input type="number" name="current_rank" value="${standing.current_rank?.Int64||1}" min="1" required></label><br><br>
             <label>สถานะ: 
                 <select name="status" required>
-                    <option value="0" ${standing.status==0||!standing.status?'selected':''}>ON</option>
-                    <option value="1" ${standing.status==1?'selected':''}>OFF</option>
+                    <option value="1" ${standing.status?.Int64==1?'selected':''}>ON</option>
+                    <option value="0" ${standing.status?.Int64==0?'selected':''}>OFF</option>
                 </select>
             </label><br><br>
             <div style="text-align:right">
@@ -168,7 +170,17 @@ function showEditStandingModal(standing) {
         // เก็บข้อมูลจากฟอร์ม
         const formData = new FormData(this);
         const data = {};
-        for (const [k,v] of formData.entries()) data[k] = v;
+        // ฟิลด์ที่ต้องแปลงเป็น int
+        const intFields = [
+            'matches_played','wins','draws','losses','goals_for','goals_against','goal_difference','points','current_rank','status'
+        ];
+        for (const [k,v] of formData.entries()) {
+            if (intFields.includes(k)) {
+                data[k] = parseInt(v, 10);
+            } else {
+                data[k] = v;
+            }
+        }
         try {
             const res = await fetch(`/api/standings/${standing.id}`, {
                 method: 'PUT',

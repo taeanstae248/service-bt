@@ -1,11 +1,28 @@
+
 package database
 
 import (
-	"database/sql"
-	"fmt"
-	"go-ballthai-scraper/models"
-	"log"
+   "database/sql"
+   "fmt"
+   "go-ballthai-scraper/models"
+   "log"
 )
+
+// UpdateStandingByID อัปเดตข้อมูล standings ตาม id
+func UpdateStandingByID(db *sql.DB, id int, standing models.StandingDB) error {
+   updateQuery := `
+	   UPDATE standings SET
+		   status = ?, matches_played = ?, wins = ?, draws = ?, losses = ?,
+		   goals_for = ?, goals_against = ?, goal_difference = ?, points = ?, current_rank = ?
+	   WHERE id = ?
+   `
+   _, err := db.Exec(updateQuery,
+	   standing.Status, standing.MatchesPlayed, standing.Wins, standing.Draws, standing.Losses,
+	   standing.GoalsFor, standing.GoalsAgainst, standing.GoalDifference, standing.Points, standing.CurrentRank,
+	   id,
+   )
+   return err
+}
 
 // GetStandingsByLeagueID คืน standings ทั้งหมดของลีกที่ระบุ
 func GetStandingsByLeagueID(db *sql.DB, leagueID int) ([]models.StandingDB, error) {
@@ -39,11 +56,13 @@ func InsertOrUpdateStanding(db *sql.DB, standing models.StandingDB) error {
 			       goals_for, goals_against, goal_difference, points, current_rank
 		       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	       `
-		_, err := db.Exec(insertQuery,
-			standing.LeagueID, standing.TeamID, standing.StageID, standing.Status, standing.MatchesPlayed,
-			standing.Wins, standing.Draws, standing.Losses, standing.GoalsFor,
-			standing.GoalsAgainst, standing.GoalDifference, standing.Points, standing.CurrentRank,
-		)
+		    statusVal := standing.Status
+		    if !statusVal.Valid { statusVal.Int64 = 0; statusVal.Valid = true }
+		    _, err := db.Exec(insertQuery,
+			    standing.LeagueID, standing.TeamID, standing.StageID, statusVal, standing.MatchesPlayed,
+			    standing.Wins, standing.Draws, standing.Losses, standing.GoalsFor,
+			    standing.GoalsAgainst, standing.GoalDifference, standing.Points, standing.CurrentRank,
+		    )
 		if err != nil {
 			return fmt.Errorf("failed to insert standing for team %d in league %d stage %v: %w", standing.TeamID, standing.LeagueID, standing.StageID, err)
 		}
@@ -58,11 +77,13 @@ func InsertOrUpdateStanding(db *sql.DB, standing models.StandingDB) error {
 			       goals_for = ?, goals_against = ?, goal_difference = ?, points = ?, current_rank = ?
 		       WHERE id = ?
 	       `
-		_, err := db.Exec(updateQuery,
-			standing.Status, standing.MatchesPlayed, standing.Wins, standing.Draws, standing.Losses,
-			standing.GoalsFor, standing.GoalsAgainst, standing.GoalDifference, standing.Points, standing.CurrentRank,
-			existingStandingID,
-		)
+		    statusVal := standing.Status
+		    if !statusVal.Valid { statusVal.Int64 = 0; statusVal.Valid = true }
+		    _, err := db.Exec(updateQuery,
+			    statusVal, standing.MatchesPlayed, standing.Wins, standing.Draws, standing.Losses,
+			    standing.GoalsFor, standing.GoalsAgainst, standing.GoalDifference, standing.Points, standing.CurrentRank,
+			    existingStandingID,
+		    )
 		if err != nil {
 			return fmt.Errorf("failed to update standing for team %d in league %d stage %v: %w", standing.TeamID, standing.LeagueID, standing.StageID, err)
 		}
