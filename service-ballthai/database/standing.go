@@ -8,7 +8,6 @@ import (
    "log"
 )
 
-// UpdateStandingByID อัปเดตข้อมูล standings ตาม id
 func UpdateStandingByID(db *sql.DB, id int, standing models.StandingDB) error {
    updateQuery := `
 	   UPDATE standings SET
