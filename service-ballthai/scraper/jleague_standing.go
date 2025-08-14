@@ -90,7 +90,7 @@ func ScrapeJLeagueStandings(db *sql.DB) error {
 			GoalDifference: teamData.GoalDifference,
 			Points:         teamData.Points,
 			CurrentRank:    sql.NullInt64{Int64: int64(teamData.Position), Valid: teamData.Position != 0},
-			Round:          sql.NullInt64{Valid: false}, // Set to null if not available
+			Status:         sql.NullInt64{Valid: false}, // เพิ่ม status (null)
 		}
 
 		// Insert or update standing in database

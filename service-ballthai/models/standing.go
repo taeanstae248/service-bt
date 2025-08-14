@@ -27,8 +27,8 @@ type StandingDB struct {
 	LeagueID       int           `json:"league_id"`
 	TeamID         int           `json:"team_id"`
 	TeamName       *string       `json:"team_name"`
-	Round          sql.NullInt64 `json:"round"`
 	StageID        sql.NullInt64 `json:"stage_id"`
+	Status         sql.NullInt64 `json:"status"`
 	MatchesPlayed  int           `json:"matches_played"`
 	Wins           int           `json:"wins"`
 	Draws          int           `json:"draws"`

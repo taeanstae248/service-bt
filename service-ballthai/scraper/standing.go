@@ -76,7 +76,7 @@ func ScrapeStandings(db *sql.DB) error {
 				GoalDifference: apiStanding.GoalDifference,
 				Points:         apiStanding.Point,
 				CurrentRank:    sql.NullInt64{Int64: int64(apiStanding.CurrentRank), Valid: apiStanding.CurrentRank != 0},
-				Round:          sql.NullInt64{Valid: false},
+				Status:         sql.NullInt64{Valid: false},
 				StageID:        stageID,
 			}
 
