@@ -127,8 +127,77 @@ async function saveOrder() {
     const order = Array.from(rows).map((row,i) => ({ id: row.dataset.id, current_rank: i+1 }));
     alert('บันทึกอันดับ (mock): '+JSON.stringify(order));
 }
+// Modal ฟอร์มแก้ไข standings
+function showEditStandingModal(standing) {
+    // ลบ modal เดิมถ้ามี
+    const oldModal = document.getElementById('editStandingModal');
+    if (oldModal) oldModal.remove();
+    // สร้าง modal
+    const modal = document.createElement('div');
+    modal.id = 'editStandingModal';
+    modal.style = 'position:fixed;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.3);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    modal.innerHTML = `
+    <div style="background:#fff;padding:2rem 2.5rem;border-radius:12px;min-width:320px;max-width:95vw;box-shadow:0 2px 16px #0002;position:relative;">
+        <h2 style="margin-top:0;margin-bottom:1.5rem;font-size:1.3rem;color:#667eea;">แก้ไขข้อมูลทีม: <span style='color:#222'>${standing.team_name||'-'}</span></h2>
+        <form id="editStandingForm">
+            <label>แข่ง: <input type="number" name="matches_played" value="${standing.matches_played||0}" min="0" required></label><br><br>
+            <label>ชนะ: <input type="number" name="wins" value="${standing.wins||0}" min="0" required></label><br><br>
+            <label>เสมอ: <input type="number" name="draws" value="${standing.draws||0}" min="0" required></label><br><br>
+            <label>แพ้: <input type="number" name="losses" value="${standing.losses||0}" min="0" required></label><br><br>
+            <label>ได้: <input type="number" name="goals_for" value="${standing.goals_for||0}" min="0" required></label><br><br>
+            <label>เสีย: <input type="number" name="goals_against" value="${standing.goals_against||0}" min="0" required></label><br><br>
+            <label>ผลต่าง: <input type="number" name="goal_difference" value="${standing.goal_difference||0}" required></label><br><br>
+            <label>แต้ม: <input type="number" name="points" value="${standing.points||0}" min="0" required></label><br><br>
+            <label>อันดับ: <input type="number" name="current_rank" value="${standing.current_rank?.Int64||1}" min="1" required></label><br><br>
+            <label>สถานะ: 
+                <select name="status" required>
+                    <option value="0" ${standing.status==0||!standing.status?'selected':''}>ON</option>
+                    <option value="1" ${standing.status==1?'selected':''}>OFF</option>
+                </select>
+            </label><br><br>
+            <div style="text-align:right">
+                <button type="button" id="cancelEditStanding">ยกเลิก</button>
+                <button type="submit" style="background:#667eea;color:#fff;border:none;padding:0.5rem 1.5rem;border-radius:5px;">บันทึก</button>
+            </div>
+        </form>
+    </div>`;
+    document.body.appendChild(modal);
+    document.getElementById('cancelEditStanding').onclick = () => modal.remove();
+    document.getElementById('editStandingForm').onsubmit = async function(e) {
+        e.preventDefault();
+        // เก็บข้อมูลจากฟอร์ม
+        const formData = new FormData(this);
+        const data = {};
+        for (const [k,v] of formData.entries()) data[k] = v;
+        try {
+            const res = await fetch(`/api/standings/${standing.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await res.json();
+            if (result.success) {
+                alert('บันทึกข้อมูลสำเร็จ!');
+                modal.remove();
+                // อัปเดตตารางใหม่ (reload)
+                if (typeof onLeagueChange === 'function') onLeagueChange();
+            } else {
+                alert('เกิดข้อผิดพลาด: '+(result.error||JSON.stringify(result)));
+            }
+        } catch (err) {
+            alert('เกิดข้อผิดพลาดขณะบันทึก: '+err);
+        }
+    };
+}
+
 function editStanding(id) {
-    alert('ฟอร์มแก้ไขข้อมูลทีม/คะแนน (mock) id='+id);
+    // หา standing จาก window._debugStandings
+    const standing = (window._debugStandings||[]).find(s => s.id==id);
+    if (!standing) {
+        alert('ไม่พบข้อมูลทีมนี้');
+        return;
+    }
+    showEditStandingModal(standing);
 }
 
 // โหลด stages ทั้งหมดไว้ล่วงหน้า (cache)
