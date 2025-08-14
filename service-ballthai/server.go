@@ -61,6 +61,7 @@ func main() {
 	router.HandleFunc("/api/teams", handlers.CreateTeam).Methods("POST")
 	// Standings API
 	router.HandleFunc("/api/standings", handlers.GetStandings).Methods("GET")
+	router.HandleFunc("/api/standings/{id:[0-9]+}", handlers.UpdateStanding).Methods("PUT")
 	router.HandleFunc("/api/teams/{id}", handlers.GetTeamByID).Methods("GET")
 	router.HandleFunc("/api/teams/{id}", handlers.UpdateTeam).Methods("PUT")
 	router.HandleFunc("/api/teams/{id}", handlers.DeleteTeam).Methods("DELETE")

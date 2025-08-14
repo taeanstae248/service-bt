@@ -1,3 +1,16 @@
+       // Debug: เพิ่ม route debug เพื่อตรวจสอบ server
+       r.HandleFunc("/debug", func(w http.ResponseWriter, r *http.Request) {
+	       w.Write([]byte("debug ok"))
+       })
+
+       // Debug: log routes ทั้งหมด
+       log.Println("[DEBUG] Registered routes:")
+       r.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
+	       tmpl, _ := route.GetPathTemplate()
+	       methods, _ := route.GetMethods()
+	       log.Printf("[DEBUG] Route: %s %v", tmpl, methods)
+	       return nil
+       })
 package main
 
 import (
@@ -67,6 +80,10 @@ func main() {
 	r.HandleFunc("/api/matches/{id:[0-9]+}", handlers.MatchDeleteHandler(db)).Methods("DELETE")
 	r.HandleFunc("/api/matches", handlers.MatchListHandler(db)).Methods("GET")
 	r.HandleFunc("/api/matches", handlers.MatchCreateHandler(db)).Methods("POST")
+
+	// Register standing update route
+	r.HandleFunc("/api/standings", handlers.CreateStanding).Methods("POST")
+	r.HandleFunc("/api/standings/{id:[0-9]+}", handlers.UpdateStanding).Methods("PUT")
 
 	// เพิ่ม NotFoundHandler เพื่อ debug
 	r.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
