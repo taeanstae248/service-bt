@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>แก้ไขข้อมูลผู้เล่น | BallThai</title>
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+    <link rel="stylesheet" href="/static/css/matches.css">
+    <link rel="stylesheet" href="/static/css/standing.css">
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div class="logo">⚽ BallThai - แก้ไขข้อมูลผู้เล่น</div>
+            <div class="user-info">
+                <a href="/dashboard.html" style="color: white; text-decoration: none; margin-right: 1rem;">🏠 หน้าหลัก</a>
+                <a href="/leagues.html" style="color: white; text-decoration: none; margin-right: 1rem;">🏆 จัดการลีก</a>
+                <a href="/teams.html" style="color: white; text-decoration: none; margin-right: 1rem;">⚽ จัดการทีม</a>
+                <a href="/matches.html" style="color: white; text-decoration: none; margin-right: 1rem;">📅 จัดการแมทช์</a>
+                <a href="/standings.html" style="color: white; text-decoration: none; margin-right: 1rem;">📊 แก้ไขตารางคะแนน</a>
+                <a href="/players.html" style="color: white; text-decoration: none; margin-right: 1rem; font-weight: bold;">🧑‍💼 แก้ไขผู้เล่น</a>
+                <button class="logout-btn" onclick="logout()">ออกจากระบบ</button>
+            </div>
+        </div>
+    </div>
+    <div class="container mt-4">
+        <h2>จัดการผู้เล่น</h2>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>ชื่อ</th>
+                    <th>หมายเลข</th>
+                    <th>ตำแหน่ง</th>
+                    <th>ทีม</th>
+                    <th>สถานะ</th>
+                    <th>จัดการ</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .Players}}
+                <tr 
+                    data-id="{{.ID}}"
+                    data-name="{{.Name}}"
+                    data-shirt_number="{{.ShirtNumber}}"
+                    data-position="{{.Position}}"
+                    data-matches_played="{{.MatchesPlayed}}"
+                    data-goals="{{.Goals}}"
+                    data-yellow_cards="{{.YellowCards}}"
+                    data-red_cards="{{.RedCards}}"
+                    data-status="{{.Status}}"
+                >
+                    <td>{{.Name}}</td>
+                    <td>{{.ShirtNumber}}</td>
+                    <td>{{.Position}}</td>
+                    <td>{{.TeamName}}</td>
+                    <td>{{if eq .Status 0}}Active{{else}}Inactive{{end}}</td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-warning" onclick="showEditModal(this)">แก้ไข</button>
+                    </td>
+                </tr>
+        <!-- Modal for editing player -->
+            <div id="editModal" class="modal" style="display:none; position:fixed; z-index:1000; left:0; top:0; width:100vw; height:100vh; background:rgba(0,0,0,0.4);">
+                <div style="background:#fff; max-width:400px; margin:10vh auto; padding:2rem; border-radius:8px; position:relative;">
+                    <h3>แก้ไขข้อมูลผู้เล่น</h3>
+                    <form id="editPlayerForm" onsubmit="return savePlayer(event)">
+                        <input type="hidden" name="id" id="edit-id">
+                        <div style="margin-bottom:1rem;">
+                            <label>ชื่อ</label>
+                            <input type="text" name="name" id="edit-name" class="form-control" required>
+                        </div>
+                        <div style="margin-bottom:1rem;">
+                            <label>หมายเลข</label>
+                            <input type="number" name="shirt_number" id="edit-shirt-number" class="form-control" required>
+                        </div>
+                        <div style="margin-bottom:1rem;">
+                            <label>ตำแหน่ง</label>
+                            <input type="text" name="position" id="edit-position" class="form-control" required>
+                        </div>
+                        <div style="margin-bottom:1rem;">
+                            <label>จำนวนนัดที่ลงเล่น</label>
+                            <input type="number" name="matches_played" id="edit-matches-played" class="form-control" required>
+                        </div>
+                        <div style="margin-bottom:1rem;">
+                            <label>ประตู</label>
+                            <input type="number" name="goals" id="edit-goals" class="form-control" required>
+                        </div>
+                        <div style="margin-bottom:1rem;">
+                            <label>ใบเหลือง</label>
+                            <input type="number" name="yellow_cards" id="edit-yellow-cards" class="form-control" required>
+                        </div>
+                        <div style="margin-bottom:1rem;">
+                            <label>ใบแดง</label>
+                            <input type="number" name="red_cards" id="edit-red-cards" class="form-control" required>
+                        </div>
+                        <div style="margin-bottom:1rem;">
+                            <label>สถานะ</label>
+                            <select name="status" id="edit-status" class="form-control">
+                                <option value="0">Active</option>
+                                <option value="1">Inactive</option>
+                            </select>
+                        </div>
+                        <div style="text-align:right;">
+                            <button type="button" onclick="closeEditModal()" class="btn btn-secondary">ยกเลิก</button>
+                            <button type="submit" class="btn btn-success">บันทึก</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+                {{else}}
+                <tr><td colspan="6" class="text-center">ไม่พบข้อมูลผู้เล่น</td></tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+    <script>
+        function logout() {
+            localStorage.removeItem('token');
+            window.location.href = '/login.html';
+        }
+
+        function showEditModal(btn) {
+            // ดึงข้อมูล player จาก data-* ของ <tr>
+            var tr = btn.closest('tr');
+            document.getElementById('edit-id').value = tr.getAttribute('data-id');
+            document.getElementById('edit-name').value = tr.getAttribute('data-name');
+            document.getElementById('edit-shirt-number').value = tr.getAttribute('data-shirt_number');
+            document.getElementById('edit-position').value = tr.getAttribute('data-position');
+            document.getElementById('edit-matches-played').value = tr.getAttribute('data-matches_played');
+            document.getElementById('edit-goals').value = tr.getAttribute('data-goals');
+            document.getElementById('edit-yellow-cards').value = tr.getAttribute('data-yellow_cards');
+            document.getElementById('edit-red-cards').value = tr.getAttribute('data-red_cards');
+            document.getElementById('edit-status').value = tr.getAttribute('data-status');
+            document.getElementById('editModal').style.display = 'block';
+        }
+        function closeEditModal() {
+            document.getElementById('editModal').style.display = 'none';
+        }
+        function savePlayer(event) {
+            event.preventDefault();
+            const form = document.getElementById('editPlayerForm');
+            const id = document.getElementById('edit-id').value;
+            const payload = {
+                name: document.getElementById('edit-name').value,
+                shirt_number: parseInt(document.getElementById('edit-shirt-number').value),
+                position: document.getElementById('edit-position').value,
+                matches_played: parseInt(document.getElementById('edit-matches-played').value),
+                goals: parseInt(document.getElementById('edit-goals').value),
+                yellow_cards: parseInt(document.getElementById('edit-yellow-cards').value),
+                red_cards: parseInt(document.getElementById('edit-red-cards').value),
+                status: parseInt(document.getElementById('edit-status').value)
+            };
+            fetch(`/api/players/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(res => {
+                if (res.ok) {
+                    alert('บันทึกสำเร็จ');
+                    closeEditModal();
+                    location.reload();
+                } else {
+                    res.text().then(t => alert('เกิดข้อผิดพลาด: ' + t));
+                }
+            })
+            .catch(err => {
+                alert('เกิดข้อผิดพลาด: ' + err);
+            });
+            return false;
+        }
+    </script>
+</body>
+</html>

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"log"
 	"net/http"
+	"html/template"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/mux"
@@ -83,16 +84,59 @@ func main() {
 	router.HandleFunc("/api/players", handlers.GetPlayers).Methods("GET")
 	router.HandleFunc("/api/players/team/{team_id}", handlers.GetPlayersByTeamID).Methods("GET")
 	router.HandleFunc("/api/players/team-post/{team_post_id}", handlers.GetPlayersByTeamPost).Methods("GET")
-
-	// Static files
-	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static/"))))
-	router.PathPrefix("/img/").Handler(http.StripPrefix("/img/", http.FileServer(http.Dir("./img/"))))
-
-	// Serve HTML templates
-	router.HandleFunc("/login.html", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./templates/login.html")
+router.HandleFunc("/api/players/{id:[0-9]+}", handlers.UpdatePlayer).Methods("PUT")
+	router.HandleFunc("/players.html", func(w http.ResponseWriter, r *http.Request) {
+		db := database.DB
+		if db == nil {
+			http.Error(w, "Database not initialized", http.StatusInternalServerError)
+			return
+		}
+		// ดึงข้อมูล players ทั้งหมด
+	rows, err := db.Query(`SELECT p.id, p.name, p.full_name_en, p.shirt_number, p.position, p.photo_url, p.matches_played, p.goals, p.yellow_cards, p.red_cards, p.status, t.name_th as team_name FROM players p LEFT JOIN teams t ON p.team_id = t.id`)
+		if err != nil {
+			log.Printf("Query error in /players.html: %v", err)
+			http.Error(w, "Query error: "+err.Error(), 500)
+			return
+		}
+		defer rows.Close()
+		type Player struct {
+			ID            int
+			Name          string
+			FullNameEN    string
+			ShirtNumber   int
+			Position      string
+			PhotoURL      string
+			MatchesPlayed int
+			Goals         int
+			YellowCards   int
+			RedCards      int
+			Status        int
+			TeamName      string
+		}
+		var players []Player
+		for rows.Next() {
+			var p Player
+			var shirtNumber sql.NullInt64
+			var position sql.NullString
+			var photoURL sql.NullString
+			var teamName sql.NullString
+			if err := rows.Scan(&p.ID, &p.Name, &p.FullNameEN, &shirtNumber, &position, &photoURL, &p.MatchesPlayed, &p.Goals, &p.YellowCards, &p.RedCards, &p.Status, &teamName); err != nil {
+				continue
+			}
+			p.ShirtNumber = int(shirtNumber.Int64)
+			p.Position = position.String
+			p.PhotoURL = photoURL.String
+			p.TeamName = teamName.String
+			players = append(players, p)
+		}
+		tmpl, err := template.ParseFiles("templates/players.html")
+		if err != nil {
+			http.Error(w, "Template error", 500)
+			return
+		}
+		data := struct{ Players []Player }{Players: players}
+		tmpl.Execute(w, data)
 	})
-
 	router.HandleFunc("/dashboard.html", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./templates/dashboard.html")
 	})

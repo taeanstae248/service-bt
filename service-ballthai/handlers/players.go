@@ -1,3 +1,4 @@
+// ...existing code...
 package handlers
 
 import (
@@ -11,6 +12,43 @@ import (
 	"go-ballthai-scraper/database"
 	"go-ballthai-scraper/scraper"
 )
+
+// UpdatePlayer updates a player's info by ID
+func UpdatePlayer(w http.ResponseWriter, r *http.Request) {
+	db := database.DB
+	if db == nil {
+		http.Error(w, "Database not initialized", http.StatusInternalServerError)
+		return
+	}
+	vars := mux.Vars(r)
+	idStr := vars["id"]
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Invalid player ID", http.StatusBadRequest)
+		return
+	}
+	type reqBody struct {
+		Name        string `json:"name"`
+		ShirtNumber int    `json:"shirt_number"`
+		Position    string `json:"position"`
+		Status      int    `json:"status"`
+	}
+	var body reqBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	// Update player in DB
+	_, err = db.Exec(`UPDATE players SET name=?, shirt_number=?, position=?, status=? WHERE id=?`,
+		body.Name, body.ShirtNumber, body.Position, body.Status, id)
+	if err != nil {
+		log.Println("Update player error:", err)
+		http.Error(w, "Failed to update player", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("OK"))
+}
 
 // ScrapePlayersHandler handles scraping players for a given tournament
 func ScrapePlayersHandler(w http.ResponseWriter, r *http.Request) {
