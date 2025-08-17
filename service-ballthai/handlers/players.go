@@ -8,7 +8,33 @@ import (
 	"strconv"
 
 	"github.com/gorilla/mux"
+	"go-ballthai-scraper/database"
+	"go-ballthai-scraper/scraper"
 )
+
+// ScrapePlayersHandler handles scraping players for a given tournament
+func ScrapePlayersHandler(w http.ResponseWriter, r *http.Request) {
+	db := database.DB
+	if db == nil {
+		http.Error(w, "Database not initialized", http.StatusInternalServerError)
+		return
+	}
+	tournamentID := 1 // default
+	if tid := r.URL.Query().Get("tournament_id"); tid != "" {
+		id, err := strconv.Atoi(tid)
+		if err == nil {
+			tournamentID = id
+		}
+	}
+	err := scraper.ScrapePlayers(db, tournamentID)
+	if err != nil {
+		log.Println("Scrape players error:", err)
+		http.Error(w, "Scrape players error", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Scrape players completed successfully"))
+}
 
 // GetPlayers returns players with optional pagination and filtering
 func GetPlayers(w http.ResponseWriter, r *http.Request) {

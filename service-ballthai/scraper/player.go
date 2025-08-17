@@ -12,10 +12,20 @@ import (
 // ScrapePlayers ดึงข้อมูลผู้เล่นจาก API และบันทึกลงฐานข้อมูล
 // ฟังก์ชันนี้รวมตรรกะจากฟังก์ชัน PHP Scrape_R*_Player และ Player_Public
 func ScrapePlayers(db *sql.DB, tournamentID int) error {
-	// ใช้ URL ใหม่ตามที่ร้องขอ พร้อมรับ tournament ID เป็น parameter
-	apiURL := fmt.Sprintf("https://competition.tl.prod.c0d1um.io/thaileague/api/player-public/all_players_search/?page=1&tournament=%d", tournamentID)
 
-	log.Printf("Scraping players from: %s", apiURL)
+	// แปลง leagueID (1,2) เป็น tournamentID (207,208) ก่อนเรียก API
+	var apiTournamentID int
+	switch tournamentID {
+	case 1:
+		apiTournamentID = 207 // Thai League 1
+	case 2:
+		apiTournamentID = 208 // Thai League 2
+	default:
+		apiTournamentID = 207 // Default to Thai League 1
+	}
+	apiURL := fmt.Sprintf("https://competition.tl.prod.c0d1um.io/thaileague/api/player-public/all_players_search/?page=1&tournament=%d", apiTournamentID)
+
+	log.Printf("Scraping players from: %s (leagueID=%d, tournamentID=%d)", apiURL, tournamentID, apiTournamentID)
 
 	var apiResponse struct {
 		Results []models.PlayerAPI `json:"results"`
@@ -29,9 +39,9 @@ func ScrapePlayers(db *sql.DB, tournamentID int) error {
 	// กำหนด League ID ตาม Tournament ID
 	var leagueID int
 	switch tournamentID {
-	case 195:
+	case 207:
 		leagueID = 1 // Thai League 1
-	case 196:
+	case 208:
 		leagueID = 2 // Thai League 2
 	default:
 		leagueID = 2 // Default to Thai League 2

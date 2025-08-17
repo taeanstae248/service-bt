@@ -77,6 +77,7 @@ func main() {
 	router.HandleFunc("/scraper/matches", handlers.ScrapeMatchesHandler).Methods("GET")
 	router.HandleFunc("/scraper/standing", handlers.ScrapeStandingsHandler).Methods("GET")
 	router.HandleFunc("/scraper/jleague", handlers.ScrapeJLeagueHandler).Methods("GET")
+	router.HandleFunc("/scraper/player", handlers.ScrapePlayersHandler).Methods("GET")
 
 	// Player routes
 	router.HandleFunc("/api/players", handlers.GetPlayers).Methods("GET")
