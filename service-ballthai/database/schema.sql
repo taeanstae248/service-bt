@@ -5,7 +5,10 @@
 -- ตารางนี้เก็บข้อมูลลีกต่างๆ
 CREATE TABLE IF NOT EXISTS `leagues` (
     `id` INT PRIMARY KEY AUTO_INCREMENT,
-    `name` VARCHAR(255) NOT NULL UNIQUE
+    `name` VARCHAR(255) NOT NULL UNIQUE,
+    `thaileageid` INT UNIQUE,
+    `thaileageseason` VARCHAR(32), 
+    `thaileagename` VARCHAR(255)
 );
 
 -- เพิ่มข้อมูลลีกตัวอย่าง
