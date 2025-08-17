@@ -8,18 +8,7 @@
     <link rel="stylesheet" href="/static/css/teams.css">
 </head>
 <body>
-    <div class="header">
-        <div class="header-content">
-            <div class="logo">⚽ BallThai - จัดการทีม</div>
-            <div class="user-info">
-                <a href="/dashboard.html" style="color: white; text-decoration: none; margin-right: 1rem;">🏠 หน้าหลัก</a>
-                <a href="/leagues.html" style="color: white; text-decoration: none; margin-right: 1rem;">🏆 จัดการลีก</a>
-                <a href="/teams.html" style="color: white; text-decoration: none; margin-right: 1rem;">⚽ จัดการทีม</a>
-                <a href="/matches.html" style="color: white; text-decoration: none; margin-right: 1rem; font-weight: bold;">📅 จัดการแมทช์</a>
-                <button class="logout-btn" onclick="logout()">ออกจากระบบ</button>
-            </div>
-        </div>
-    </div>
+    {{ template "_nav.html" . }}
 
     <div class="container">
         <!-- Alert Container -->

@@ -8,19 +8,7 @@
     <link rel="stylesheet" href="/static/css/standing.css">
 </head>
 <body>
-    <div class="header">
-        <div class="header-content">
-            <div class="logo">⚽ BallThai - แก้ไขตารางคะแนน</div>
-            <div class="user-info">
-                <a href="/dashboard.html" style="color: white; text-decoration: none; margin-right: 1rem;">🏠 หน้าหลัก</a>
-                <a href="/leagues.html" style="color: white; text-decoration: none; margin-right: 1rem;">🏆 จัดการลีก</a>
-                <a href="/teams.html" style="color: white; text-decoration: none; margin-right: 1rem;">⚽ จัดการทีม</a>
-                <a href="/matches.html" style="color: white; text-decoration: none; margin-right: 1rem;">📅 จัดการแมทช์</a>
-                <a href="/standings.html" style="color: white; text-decoration: none; margin-right: 1rem; font-weight: bold;">📊 แก้ไขตารางคะแนน</a>
-                <button class="logout-btn" onclick="logout()">ออกจากระบบ</button>
-            </div>
-        </div>
-    </div>
+    {{ template "_nav.html" . }}
     <!-- ส่วนอื่น ๆ ของ body เช่น container standings, league_select, stageZoneContainer, standingsContainer -->
     <div id="mainContainer" class="container">
         <div style="margin-bottom:1rem">

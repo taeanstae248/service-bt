@@ -8,20 +8,7 @@
     <link rel="stylesheet" href="/static/css/standing.css">
 </head>
 <body>
-    <div class="header">
-        <div class="header-content">
-            <div class="logo">⚽ BallThai - แก้ไขข้อมูลผู้เล่น</div>
-            <div class="user-info">
-                <a href="/dashboard.html" style="color: white; text-decoration: none; margin-right: 1rem;">🏠 หน้าหลัก</a>
-                <a href="/leagues.html" style="color: white; text-decoration: none; margin-right: 1rem;">🏆 จัดการลีก</a>
-                <a href="/teams.html" style="color: white; text-decoration: none; margin-right: 1rem;">⚽ จัดการทีม</a>
-                <a href="/matches.html" style="color: white; text-decoration: none; margin-right: 1rem;">📅 จัดการแมทช์</a>
-                <a href="/standings.html" style="color: white; text-decoration: none; margin-right: 1rem;">📊 แก้ไขตารางคะแนน</a>
-                <a href="/players.html" style="color: white; text-decoration: none; margin-right: 1rem; font-weight: bold;">🧑‍💼 แก้ไขผู้เล่น</a>
-                <button class="logout-btn" onclick="logout()">ออกจากระบบ</button>
-            </div>
-        </div>
-    </div>
+    {{ template "_nav.html" . }}
     <div class="container mt-4">
         <h2>จัดการผู้เล่น</h2>
         <div style="margin-bottom:1rem; display:flex; gap:1rem; align-items:center; flex-wrap:wrap;">

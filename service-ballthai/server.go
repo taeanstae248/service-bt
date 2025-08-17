@@ -147,7 +147,7 @@ router.HandleFunc("/api/players/{id:[0-9]+}", handlers.UpdatePlayer).Methods("PU
 			p.TeamName = teamName.String
 			players = append(players, p)
 		}
-		tmpl, err := template.ParseFiles("templates/players.html")
+		tmpl, err := template.ParseFiles("templates/players.html", "templates/_nav.html")
 		if err != nil {
 			http.Error(w, "Template error", 500)
 			return
@@ -155,25 +155,55 @@ router.HandleFunc("/api/players/{id:[0-9]+}", handlers.UpdatePlayer).Methods("PU
 		data := struct{ Players []Player }{Players: players}
 		tmpl.Execute(w, data)
 	})
+
 	router.HandleFunc("/dashboard.html", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./templates/dashboard.html")
+		tmpl, err := template.ParseFiles("templates/dashboard.html", "templates/_nav.html")
+		if err != nil {
+			http.Error(w, "Template error", 500)
+			return
+		}
+		tmpl.Execute(w, nil)
 	})
 
 	router.HandleFunc("/teams.html", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./templates/teams.html")
+		tmpl, err := template.ParseFiles("templates/teams.html", "templates/_nav.html")
+		if err != nil {
+			http.Error(w, "Template error", 500)
+			return
+		}
+		tmpl.Execute(w, nil)
 	})
 
 	router.HandleFunc("/leagues.html", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./templates/leagues.html")
+		tmpl, err := template.ParseFiles("templates/leagues.html", "templates/_nav.html")
+		if err != nil {
+			http.Error(w, "Template error", 500)
+			return
+		}
+		tmpl.Execute(w, nil)
 	})
 
 	router.HandleFunc("/matches.html", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./templates/matches.html")
+		tmpl, err := template.ParseFiles("templates/matches.html", "templates/_nav.html")
+		if err != nil {
+			http.Error(w, "Template error", 500)
+			return
+		}
+		tmpl.Execute(w, nil)
 	})
 
 	router.HandleFunc("/standings.html", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./templates/standings.html")
+		tmpl, err := template.ParseFiles("templates/standings.html", "templates/_nav.html")
+		if err != nil {
+			http.Error(w, "Template error", 500)
+			return
+		}
+		tmpl.Execute(w, nil)
 	})
+
+
+	// Serve static files (css, js, images)
+	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
 	// Redirect root to login
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
