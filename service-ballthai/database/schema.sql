@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS `players` (
     `goals` INT DEFAULT 0,               -- จำนวนประตูที่ทำได้
     `yellow_cards` INT DEFAULT 0,        -- จำนวนใบเหลือง
     `red_cards` INT DEFAULT 0,           -- จำนวนใบแดง
-    `status` INT,                        -- สถานะผู้เล่น (เช่น active/inactive)
+    `status` INT DEFAULT 0,               -- สถานะผู้เล่น (เช่น active/inactive)
     FOREIGN KEY (`league_id`) REFERENCES `leagues`(`id`),
     FOREIGN KEY (`team_id`) REFERENCES `teams`(`id`),
     FOREIGN KEY (`nationality_id`) REFERENCES `nationalities`(`id`)
