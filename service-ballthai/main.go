@@ -1,21 +1,10 @@
-       // Debug: เพิ่ม route debug เพื่อตรวจสอบ server
-       r.HandleFunc("/debug", func(w http.ResponseWriter, r *http.Request) {
-	       w.Write([]byte("debug ok"))
-       })
-
-       // Debug: log routes ทั้งหมด
-       log.Println("[DEBUG] Registered routes:")
-       r.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
-	       tmpl, _ := route.GetPathTemplate()
-	       methods, _ := route.GetMethods()
-	       log.Printf("[DEBUG] Route: %s %v", tmpl, methods)
-	       return nil
-       })
+// ...existing code...
 package main
 
 import (
 	"database/sql"
 	"go-ballthai-scraper/handlers"
+	"go-ballthai-scraper/scraper"
 	"log"
 	"net/http"
 	"os"
@@ -28,6 +17,27 @@ import (
 var db *sql.DB // ตัวแปร Global สำหรับเก็บ Connection ฐานข้อมูล
 
 func main() {
+// ...existing code...
+       // ...existing code...
+// ...existing code...
+       r := mux.NewRouter()
+
+       // Debug: เพิ่ม route debug เพื่อตรวจสอบ server
+       r.HandleFunc("/debug", func(w http.ResponseWriter, r *http.Request) {
+	       w.Write([]byte("debug ok"))
+       })
+
+       // Scraper: เพิ่ม route สำหรับ trigger J-League Scraper (GET/POST)
+       r.HandleFunc("/scraper/jleague", handlers.ScrapeJLeagueHandler).Methods("GET", "POST")
+
+       // Debug: log routes ทั้งหมด
+       log.Println("[DEBUG] Registered routes:")
+       r.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
+	       tmpl, _ := route.GetPathTemplate()
+	       methods, _ := route.GetMethods()
+	       log.Printf("[DEBUG] Route: %s %v", tmpl, methods)
+	       return nil
+       })
 	log.Println("BallThai service starting...") // เพิ่ม log ตรงนี้
 
 	// Load values from .env file
@@ -62,6 +72,9 @@ func main() {
 		log.Fatalf("Error opening database connection: %v", err)
 	}
 	defer db.Close()
+
+	// Set global DB for handlers
+	database.DB = db
 
 	// Test the database connection
 	err = db.Ping()

@@ -76,6 +76,7 @@ func main() {
 	// เพิ่ม route สำหรับ scraper
 	router.HandleFunc("/scraper/matches", handlers.ScrapeMatchesHandler).Methods("GET")
 	router.HandleFunc("/scraper/standing", handlers.ScrapeStandingsHandler).Methods("GET")
+	router.HandleFunc("/scraper/jleague", handlers.ScrapeJLeagueHandler).Methods("GET")
 
 	// Player routes
 	router.HandleFunc("/api/players", handlers.GetPlayers).Methods("GET")
