@@ -24,6 +24,18 @@
     </div>
     <div class="container mt-4">
         <h2>จัดการผู้เล่น</h2>
+        <div style="margin-bottom:1rem; display:flex; gap:1rem; align-items:center; flex-wrap:wrap;">
+            <label>ค้นหาจากลีก:
+                <select id="leagueSelect" class="form-control" style="width:180px;"></select>
+            </label>
+            <label>ค้นหาชื่อ:
+                <input type="text" id="playerNameInput" class="form-control" style="width:180px;" placeholder="ชื่อผู้เล่น">
+            </label>
+            <label>ค้นหาจากทีม:
+                <select id="teamSelect" class="form-control" style="width:180px;"></select>
+            </label>
+            <button class="btn btn-primary" onclick="filterPlayers()">ค้นหา</button>
+        </div>
         <table class="table table-striped">
             <thead>
                 <tr>
@@ -94,8 +106,8 @@
                         <div style="margin-bottom:1rem;">
                             <label>สถานะ</label>
                             <select name="status" id="edit-status" class="form-control">
-                                <option value="0">Active</option>
-                                <option value="1">Inactive</option>
+                                <option value="0">ON</option>
+                                <option value="1">OFF</option>
                             </select>
                         </div>
                         <div style="text-align:right;">
@@ -112,6 +124,42 @@
         </table>
     </div>
     <script>
+        // โหลดลีกและทีม
+        let allLeagues = [];
+        let allTeams = [];
+        document.addEventListener('DOMContentLoaded', function() {
+            fetch('/api/leagues').then(r=>r.json()).then(data => {
+                allLeagues = data.data || data.Data || [];
+                const leagueSelect = document.getElementById('leagueSelect');
+                leagueSelect.innerHTML = '<option value="">-- ทุกลีก --</option>' + allLeagues.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+            });
+            fetch('/api/teams').then(r=>r.json()).then(data => {
+                allTeams = data.data || data.Data || [];
+                renderTeamOptions();
+            });
+            document.getElementById('leagueSelect').addEventListener('change', renderTeamOptions);
+        });
+        function renderTeamOptions() {
+            const leagueId = document.getElementById('leagueSelect').value;
+            let teams = allTeams;
+            if (leagueId) {
+                teams = allTeams.filter(t => t.league_id == leagueId);
+            }
+            const teamSelect = document.getElementById('teamSelect');
+            teamSelect.innerHTML = '<option value="">-- ทุกทีม --</option>' + teams.map(t => `<option value="${t.id}">${t.name_th}</option>`).join('');
+        }
+
+        // ฟังก์ชัน filter ตารางผู้เล่น (reload หน้าใหม่ด้วย team_id)
+        function filterPlayers() {
+            const teamId = document.getElementById('teamSelect').value;
+            const playerName = document.getElementById('playerNameInput').value.trim();
+            let url = '/players.html';
+            const params = [];
+            if (teamId) params.push('team_id=' + encodeURIComponent(teamId));
+            if (playerName) params.push('name=' + encodeURIComponent(playerName));
+            if (params.length > 0) url += '?' + params.join('&');
+            window.location.href = url;
+        }
         function logout() {
             localStorage.removeItem('token');
             window.location.href = '/login.html';

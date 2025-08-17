@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"html/template"
+	"strings"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/mux"
@@ -91,8 +92,25 @@ router.HandleFunc("/api/players/{id:[0-9]+}", handlers.UpdatePlayer).Methods("PU
 			http.Error(w, "Database not initialized", http.StatusInternalServerError)
 			return
 		}
-		// ดึงข้อมูล players ทั้งหมด
-	rows, err := db.Query(`SELECT p.id, p.name, p.full_name_en, p.shirt_number, p.position, p.photo_url, p.matches_played, p.goals, p.yellow_cards, p.red_cards, p.status, t.name_th as team_name FROM players p LEFT JOIN teams t ON p.team_id = t.id`)
+		// Filter by team_id and name if present
+		teamID := r.URL.Query().Get("team_id")
+		name := r.URL.Query().Get("name")
+		baseQuery := `SELECT p.id, p.name, p.full_name_en, p.shirt_number, p.position, p.photo_url, p.matches_played, p.goals, p.yellow_cards, p.red_cards, p.status, t.name_th as team_name FROM players p LEFT JOIN teams t ON p.team_id = t.id`
+		var where []string
+		var args []interface{}
+		if teamID != "" {
+			where = append(where, "p.team_id = ?")
+			args = append(args, teamID)
+		}
+		if name != "" {
+			where = append(where, "p.name LIKE ?")
+			args = append(args, "%"+name+"%")
+		}
+		query := baseQuery
+		if len(where) > 0 {
+			query += " WHERE " + strings.Join(where, " AND ")
+		}
+		rows, err := db.Query(query, args...)
 		if err != nil {
 			log.Printf("Query error in /players.html: %v", err)
 			http.Error(w, "Query error: "+err.Error(), 500)

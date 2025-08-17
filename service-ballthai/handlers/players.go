@@ -28,10 +28,14 @@ func UpdatePlayer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	type reqBody struct {
-		Name        string `json:"name"`
-		ShirtNumber int    `json:"shirt_number"`
-		Position    string `json:"position"`
-		Status      int    `json:"status"`
+		Name          string `json:"name"`
+		ShirtNumber   int    `json:"shirt_number"`
+		Position      string `json:"position"`
+		MatchesPlayed int    `json:"matches_played"`
+		Goals         int    `json:"goals"`
+		YellowCards   int    `json:"yellow_cards"`
+		RedCards      int    `json:"red_cards"`
+		Status        int    `json:"status"`
 	}
 	var body reqBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -39,8 +43,8 @@ func UpdatePlayer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Update player in DB
-	_, err = db.Exec(`UPDATE players SET name=?, shirt_number=?, position=?, status=? WHERE id=?`,
-		body.Name, body.ShirtNumber, body.Position, body.Status, id)
+	_, err = db.Exec(`UPDATE players SET name=?, shirt_number=?, position=?, matches_played=?, goals=?, yellow_cards=?, red_cards=?, status=? WHERE id=?`,
+		body.Name, body.ShirtNumber, body.Position, body.MatchesPlayed, body.Goals, body.YellowCards, body.RedCards, body.Status, id)
 	if err != nil {
 		log.Println("Update player error:", err)
 		http.Error(w, "Failed to update player", http.StatusInternalServerError)
