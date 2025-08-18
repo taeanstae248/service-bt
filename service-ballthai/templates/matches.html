@@ -50,11 +50,11 @@
                     </div>
                     <div style="margin-bottom:1rem;">
                         <label>วันแข่งขัน</label>
-                        <input type="date" name="start_date" required class="search-input">
+                        <input type="date" name="start_date" required class="search-input" id="start_date">
                     </div>
                     <div style="margin-bottom:1rem;">
                         <label>เวลาแข่งขัน</label>
-                        <input type="time" name="start_time" required class="search-input">
+                        <input type="time" name="start_time" required class="search-input" id="start_time">
                     </div>
                     <div style="margin-bottom:1rem;">
                         <label>ทีมเหย้า</label>
@@ -70,8 +70,8 @@
                     </div>
                     <div style="margin-bottom:1rem;">
                         <label>สกอร์</label>
-                        <input type="number" name="home_score" min="0" value="0" style="width:60px;"> - <input
-                            type="number" name="away_score" min="0" value="0" style="width:60px;">
+                        <input type="number" name="home_score" min="0" value="0" style="width:60px;" id="home_score"> - 
+                        <input type="number" name="away_score" min="0" value="0" style="width:60px;" id="away_score">
                     </div>
                     <div style="margin-bottom:1rem;">
                         <label>Channel (ทีวีหลัก)</label>
@@ -93,11 +93,9 @@
                     </div>
                     <div style="margin-bottom:1rem;">
                         <label>สถานะการแข่งขัน</label>
-                        <select name="match_status" id="match_status_select" class="search-input" required>
-                            <option value="ADD">ADD</option>
-                            <option value="EDIT">EDIT</option>
+                        <select name="match_status" id="match_status_select" class="search-input" required>                            
                             <option value="FINISHED">FINISHED</option>
-                            <option value="OFF">OFF</option>
+                            <option value="OFF">OFF - ปิดดึงข้อมูล</option>
                         </select>
                     </div>
                     <div style="display:flex; justify-content:flex-end; gap:8px;">

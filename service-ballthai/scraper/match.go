@@ -33,25 +33,34 @@ func scrapeMatchesByConfig(db *sql.DB, baseURL string, pages []int, tournamentPa
 					log.Printf("Warning: Failed to insert/update stage for match %d (%s): %v", apiMatch.ID, apiMatch.StageName, err)
 				}
 			}
-			   // ไม่ต้องดาวน์โหลดโลโก้ซ้ำที่นี่ เพราะ InsertOrUpdateTeam จะจัดการให้แล้ว
 
-			   // รับ Home Team ID (หาเฉพาะใน DB ไม่ insert/update)
-			   homeTeamID := sql.NullInt64{Valid: false}
-			   if apiMatch.HomeTeamName != "" {
-				   tID, err := database.GetTeamIDByThaiName(db, apiMatch.HomeTeamName, "")
-				   if err == nil {
-					   homeTeamID = sql.NullInt64{Int64: int64(tID), Valid: true}
-				   }
-			   }
+			// เช็ค match_status ใน DB ถ้าเป็น OFF ให้ข้ามการอัปเดต
+			var currentStatus string
+			err := db.QueryRow("SELECT match_status FROM matches WHERE match_ref_id = ?", apiMatch.ID).Scan(&currentStatus)
+			if err == nil && currentStatus == "OFF" {
+				log.Printf("Skip update match %d (status=OFF)", apiMatch.ID)
+				continue
+			}
 
-			   // รับ Away Team ID (หาเฉพาะใน DB ไม่ insert/update)
-			   awayTeamID := sql.NullInt64{Valid: false}
-			   if apiMatch.AwayTeamName != "" {
-				   tID, err := database.GetTeamIDByThaiName(db, apiMatch.AwayTeamName, "")
-				   if err == nil {
-					   awayTeamID = sql.NullInt64{Int64: int64(tID), Valid: true}
-				   }
-			   }
+			// ไม่ต้องดาวน์โหลดโลโก้ซ้ำที่นี่ เพราะ InsertOrUpdateTeam จะจัดการให้แล้ว
+
+			// รับ Home Team ID (หาเฉพาะใน DB ไม่ insert/update)
+			homeTeamID := sql.NullInt64{Valid: false}
+			if apiMatch.HomeTeamName != "" {
+				tID, err := database.GetTeamIDByThaiName(db, apiMatch.HomeTeamName, "")
+				if err == nil {
+					homeTeamID = sql.NullInt64{Int64: int64(tID), Valid: true}
+				}
+			}
+
+			// รับ Away Team ID (หาเฉพาะใน DB ไม่ insert/update)
+			awayTeamID := sql.NullInt64{Valid: false}
+			if apiMatch.AwayTeamName != "" {
+				tID, err := database.GetTeamIDByThaiName(db, apiMatch.AwayTeamName, "")
+				if err == nil {
+					awayTeamID = sql.NullInt64{Int64: int64(tID), Valid: true}
+				}
+			}
 
 			// รับ Channel ID (Main TV)
 			channelID := sql.NullInt64{Valid: false}
