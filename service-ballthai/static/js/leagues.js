@@ -173,6 +173,7 @@ function editLeague(id) {
     currentLeague = league;
     document.getElementById('modalTitle').textContent = 'แก้ไขลีก';
     document.getElementById('leagueName').value = league.name;
+    document.getElementById('thaileageid').value = league.thaileageid || '';
     document.getElementById('leagueModal').style.display = 'block';
     document.getElementById('leagueName').focus();
 }

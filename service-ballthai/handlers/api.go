@@ -29,10 +29,11 @@ type League struct {
 
 type Team struct {
 	ID              int     `json:"id"`
+	Name            string  `json:"name"` // เพิ่ม field name (map จาก name_th)
 	NameTh          string  `json:"name_th"`
 	StadiumID       *int    `json:"stadium_id,omitempty"`
 	StadiumName     *string `json:"stadium_name,omitempty"`
-	Logo            *string `json:"logo,omitempty"`
+	Logo            *string `json:"logo"` // ส่ง logo_url เป็น logo
 	EstablishedYear *int    `json:"established_year,omitempty"`
 	TeamPostID      *int    `json:"team_post_id,omitempty"`
 }
@@ -258,16 +259,23 @@ func GetTeams(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	var teams []Team
-	for rows.Next() {
-		var team Team
-		if err := rows.Scan(&team.ID, &team.NameTh, &team.TeamPostID, &team.StadiumID,
-			&team.StadiumName, &team.Logo, &team.EstablishedYear); err != nil {
-			http.Error(w, fmt.Sprintf("Scan error: %v", err), http.StatusInternalServerError)
-			return
-		}
-		teams = append(teams, team)
-	}
+	   var teams []Team
+	   for rows.Next() {
+		   var team Team
+		   var logoUrl sql.NullString
+		   if err := rows.Scan(&team.ID, &team.NameTh, &team.TeamPostID, &team.StadiumID,
+			   &team.StadiumName, &logoUrl, &team.EstablishedYear); err != nil {
+			   http.Error(w, fmt.Sprintf("Scan error: %v", err), http.StatusInternalServerError)
+			   return
+		   }
+		   team.Name = team.NameTh // map name_th -> name
+		   if logoUrl.Valid {
+			   team.Logo = &logoUrl.String
+		   } else {
+			   team.Logo = nil
+		   }
+		   teams = append(teams, team)
+	   }
 
 	response := APIResponse{
 		Success: true,

@@ -122,16 +122,27 @@ function renderTeams(teamsToRender) {
         return;
     }
 
-    container.innerHTML = teamsToRender.map(team => `
+    container.innerHTML = teamsToRender.map(team => {
+        // รองรับ field หลายแบบจาก backend
+        const teamName = team.name_th || team.name_en || team.name || team.team_name || 'undefined';
+        // รองรับ field โลโก้หลายแบบ
+        let logoSrc = '/static/img/default-logo.png';
+        if (team.logo_url) {
+            logoSrc = team.logo_url;
+        } else if (team.logo) {
+            logoSrc = team.logo;
+        } else if (team.logo_path) {
+            logoSrc = team.logo_path;
+        } else if (team.logo_filename) {
+            logoSrc = '/img/teams/' + team.logo_filename;
+        }
+        return `
         <div class="team-card" data-team-id="${team.id}">
             <div class="team-header">
-                ${team.logo ? 
-                    `<img src="${team.logo}" alt="${team.name}" class="team-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">` :
-                    ''
-                }
-                <div class="team-logo-placeholder" ${team.logo ? 'style="display:none"' : ''}>⚽</div>
+                <img src="${logoSrc}" alt="${teamName}" class="team-logo" onerror="this.src='/static/img/default-logo.png';">
+                <div class="team-logo-placeholder" ${(logoSrc && logoSrc !== '/static/img/default-logo.png') ? 'style="display:none"' : ''}>⚽</div>
                 <div class="team-info">
-                    <h3>${team.name}</h3>
+                    <h3>${teamName}</h3>
                     <p>สนาม: ${team.stadium_name || 'ไม่ระบุ'}</p>
                     ${team.team_post_id ? `<p>Team Post ID: ${team.team_post_id}</p>` : ''}
                 </div>
@@ -139,10 +150,11 @@ function renderTeams(teamsToRender) {
             <div class="team-actions">
                 <button class="btn-secondary" onclick="editTeam(${team.id})">แก้ไข</button>
                 <button class="btn-secondary" onclick="uploadLogo(${team.id})">เปลี่ยนโลโก้</button>
-                <button class="btn-danger" onclick="deleteTeam(${team.id}, '${team.name}')">ลบ</button>
+                <button class="btn-danger" onclick="deleteTeam(${team.id}, '${teamName}')">ลบ</button>
             </div>
         </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 function initializeEventListeners() {
