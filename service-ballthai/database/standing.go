@@ -1,4 +1,3 @@
-
 package database
 
 import (
@@ -7,6 +6,13 @@ import (
    "go-ballthai-scraper/models"
    "log"
 )
+
+// UpdateStandingRankByID อัปเดต current_rank ของ standing ตาม id
+func UpdateStandingRankByID(db *sql.DB, id int, currentRank int) error {
+	q := `UPDATE standings SET current_rank=? WHERE id=?`
+	_, err := db.Exec(q, currentRank, id)
+	return err
+}
 
 func UpdateStandingByID(db *sql.DB, id int, standing models.StandingDB) error {
    updateQuery := `

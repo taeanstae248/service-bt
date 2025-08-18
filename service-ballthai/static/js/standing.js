@@ -122,10 +122,25 @@ function updateMoveBtnState(tbody) {
     });
 }
 async function saveOrder() {
-    const leagueId = document.getElementById('league_select').value;
+    const leagueId = parseInt(document.getElementById('league_select').value, 10);
     const rows = document.querySelectorAll('.standings-table tbody tr');
-    const order = Array.from(rows).map((row,i) => ({ id: row.dataset.id, current_rank: i+1 }));
-    alert('บันทึกอันดับ (mock): '+JSON.stringify(order));
+    const order = Array.from(rows).map((row,i) => ({ id: parseInt(row.dataset.id, 10), current_rank: i+1 }));
+    try {
+        const res = await fetch('/api/standings/order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ league_id: leagueId, order })
+        });
+        const result = await res.json();
+        if (result.success) {
+            alert('บันทึกอันดับสำเร็จ!');
+            if (typeof onLeagueChange === 'function') onLeagueChange();
+        } else {
+            alert('เกิดข้อผิดพลาด: ' + (result.error || JSON.stringify(result)));
+        }
+    } catch (err) {
+        alert('เกิดข้อผิดพลาดขณะบันทึก: ' + err);
+    }
 }
 // Modal ฟอร์มแก้ไข standings
 function showEditStandingModal(standing) {

@@ -1,13 +1,49 @@
-
 package handlers
+
 import (
-	"encoding/json"
-	"go-ballthai-scraper/database"
-	"go-ballthai-scraper/models"
-	"net/http"
-	"strconv"
-	"database/sql"
+   "encoding/json"
+   "go-ballthai-scraper/database"
+   "go-ballthai-scraper/models"
+   "net/http"
+   "strconv"
+   "database/sql"
 )
+
+// UpdateStandingsOrder อัปเดต current_rank ของ standings หลายรายการ
+func UpdateStandingsOrder(w http.ResponseWriter, r *http.Request) {
+   w.Header().Set("Content-Type", "application/json")
+   var req struct {
+	   LeagueID int `json:"league_id"`
+	   Order []struct {
+		   ID int `json:"id"`
+		   CurrentRank int `json:"current_rank"`
+	   } `json:"order"`
+   }
+   if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	   http.Error(w, `{"success": false, "error": "invalid json"}`, http.StatusBadRequest)
+	   return
+   }
+   // Validate
+   if len(req.Order) == 0 {
+	   http.Error(w, `{"success": false, "error": "order is required"}`, http.StatusBadRequest)
+	   return
+   }
+   // อัปเดตทีละรายการ
+   var updated, failed int
+   for _, o := range req.Order {
+	   err := database.UpdateStandingRankByID(database.DB, o.ID, o.CurrentRank)
+	   if err != nil {
+		   failed++
+	   } else {
+		   updated++
+	   }
+   }
+   json.NewEncoder(w).Encode(map[string]interface{}{
+	   "success": failed == 0,
+	   "updated": updated,
+	   "failed": failed,
+   })
+}
 
 // UpdateStanding อัปเดตข้อมูล standings ตาม id
 func UpdateStanding(w http.ResponseWriter, r *http.Request) {
