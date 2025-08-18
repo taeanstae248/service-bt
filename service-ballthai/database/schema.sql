@@ -12,14 +12,14 @@ CREATE TABLE IF NOT EXISTS `leagues` (
 );
 
 -- เพิ่มข้อมูลลีกตัวอย่าง
-INSERT INTO leagues (id, name) VALUES
-(1, 'ไทยลีก 1'),
-(2, 'ไทยลีก 2'),
-(3, 'ไทยลีก 3'),
-(4, 'Revo League Cup'),
-(5, 'FA Cup'),
-(6, 'BGC Cup'),
-(59, 'Samipro');
+INSERT INTO leagues (id, name, thaileageid) VALUES
+(1, 'ไทยลีก 1', 207),
+(2, 'ไทยลีก 2', 208),
+(3, 'ไทยลีก 3', 197),
+(4, 'League Cup', 202),
+(5, 'FA Cup', 199),
+(6, 'BGC Cup', 205),
+(59, 'Samipro', 206);
 
 -- 2. สร้างตาราง stadiums (สนาม)
 -- ตารางนี้เก็บข้อมูลสนามแข่งขัน

@@ -5,6 +5,7 @@ import (
 	"go-ballthai-scraper/scraper"
 	"log"
 	"net/http"
+	"fmt"
 )
 
 func ScrapeStandingsHandler(w http.ResponseWriter, r *http.Request) {
@@ -30,7 +31,25 @@ func ScrapeMatchesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := scraper.ScrapeThaileagueMatches(db, "all")
+	// ปรับให้แสดงผลลัพธ์ลีกและลิงก์ที่ดึง
+	var resultMsg string
+	leagues, err := database.GetAllLeagues(db)
+	if err != nil {
+		log.Println("Scrape error:", err)
+		http.Error(w, "Scrape error", http.StatusInternalServerError)
+		return
+	}
+
+	baseURL := "https://competition.tl.prod.c0d1um.io/thaileague/api/match-day-match-public/?page=1&tournament="
+
+	for _, league := range leagues {
+		if league.ThaileageID != 0 {
+			url := baseURL + fmt.Sprintf("%d", league.ThaileageID)
+			resultMsg += fmt.Sprintf("%s\n%s\n\n", league.Name, url)
+		}
+	}
+
+	err = scraper.ScrapeThaileagueMatches(db, "all")
 	if err != nil {
 		log.Println("Scrape error:", err)
 		http.Error(w, "Scrape error", http.StatusInternalServerError)
@@ -38,5 +57,9 @@ func ScrapeMatchesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Scrape completed successfully"))
+	if resultMsg == "" {
+		w.Write([]byte("Scrape completed successfully (no leagues found)"))
+	} else {
+		w.Write([]byte("Scrape completed successfully.\n\nLeagues scraped:\n" + resultMsg))
+	}
 }

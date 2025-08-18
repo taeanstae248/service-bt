@@ -1,15 +1,32 @@
+
 package database
 
 import (
-	"database/sql"
-	"fmt"
-	"log"
-
-	"go-ballthai-scraper/models" // Ensure this module name matches your go.mod
+    "database/sql"
+    "fmt"
+    "log"
+    "go-ballthai-scraper/models"
 )
 
-// GetLeagueID ถูกย้ายไปที่ database/common.go แล้ว
-// ดังนั้นไฟล์นี้จะเหลือแค่ InsertOrUpdateLeague (ถ้ามี) หรือถูกลบไปถ้าไม่มีฟังก์ชันอื่น
+// GetAllLeagues returns all leagues from the database (id, name, thaileageid)
+func GetAllLeagues(db *sql.DB) ([]models.LeagueDB, error) {
+    rows, err := db.Query("SELECT id, name, thaileageid FROM leagues ORDER BY thaileageid ASC")
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+
+    var leagues []models.LeagueDB
+    for rows.Next() {
+        var l models.LeagueDB
+        err := rows.Scan(&l.ID, &l.Name, &l.ThaileageID)
+        if err != nil {
+            return nil, err
+        }
+        leagues = append(leagues, l)
+    }
+    return leagues, nil
+}
 
 // InsertOrUpdateLeague inserts or updates a league record in the database.
 // This function can be used if you have a specific LeagueDB struct to insert/update.
