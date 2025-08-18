@@ -1,11 +1,11 @@
 package handlers
 
 import (
+	"fmt"
 	"go-ballthai-scraper/database"
 	"go-ballthai-scraper/scraper"
 	"log"
 	"net/http"
-	"fmt"
 )
 
 func ScrapeStandingsHandler(w http.ResponseWriter, r *http.Request) {
@@ -62,4 +62,21 @@ func ScrapeMatchesHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		w.Write([]byte("Scrape completed successfully.\n\nLeagues scraped:\n" + resultMsg))
 	}
+}
+
+// ScrapeSeasonsHandler สำหรับ trigger sync seasons จาก API
+func ScrapeSeasonsHandler(w http.ResponseWriter, r *http.Request) {
+	db := database.DB
+	if db == nil {
+		http.Error(w, "Database not initialized", http.StatusInternalServerError)
+		return
+	}
+	err := scraper.ScrapeAndSyncSeasonsFromAPI(db)
+	if err != nil {
+		log.Println("Scrape seasons error:", err)
+		http.Error(w, "Scrape seasons error", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Scrape seasons completed successfully"))
 }

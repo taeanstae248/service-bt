@@ -167,9 +167,9 @@ ALTER TABLE `teams` ADD CONSTRAINT `fk_teams_stadium_id` FOREIGN KEY (`stadium_i
 CREATE TABLE IF NOT EXISTS seasons (
     id INT AUTO_INCREMENT PRIMARY KEY,
     league_id INT NOT NULL,
-    season_year VARCHAR(20) NOT NULL,
-    start_date DATE,
-    end_date DATE,
+    name VARCHAR(20) NOT NULL,
+    season_start_date DATE,
+    season_end_date DATE,
     FOREIGN KEY (league_id) REFERENCES leagues(id)
 );
 -- schema.sql
