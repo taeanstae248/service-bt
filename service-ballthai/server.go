@@ -202,6 +202,17 @@ router.HandleFunc("/api/players/{id:[0-9]+}", handlers.UpdatePlayer).Methods("PU
 	})
 
 
+
+	// เพิ่ม route สำหรับหน้า login.html
+	router.HandleFunc("/login.html", func(w http.ResponseWriter, r *http.Request) {
+		tmpl, err := template.ParseFiles("templates/login.html", "templates/_nav.html")
+		if err != nil {
+			http.Error(w, "Template error", 500)
+			return
+		}
+		tmpl.Execute(w, nil)
+	})
+
 	// Serve static files (css, js, images)
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 

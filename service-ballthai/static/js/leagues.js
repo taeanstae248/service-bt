@@ -146,7 +146,7 @@ function renderLeagues(leaguesList) {
         <div class="league-card">
             <div class="league-info">
                 <h3>${escapeHtml(league.name)}</h3>
-                <p>ID: ${league.id}</p>
+                <p>ID: ${league.id}${league.thaileageid ? ` | ThaiLeagueID: ${league.thaileageid}` : ''}</p>
             </div>
             <div class="league-actions">
                 <button onclick="editLeague(${league.id})" class="btn btn-edit">แก้ไข</button>
@@ -188,7 +188,8 @@ async function saveLeague(event) {
     
     const formData = new FormData(event.target);
     const leagueData = {
-        name: formData.get('name').trim()
+        name: formData.get('name').trim(),
+        thaileageid: formData.get('thaileageid') ? parseInt(formData.get('thaileageid')) : null
     };
 
     // Validation

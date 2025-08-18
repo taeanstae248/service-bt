@@ -17,7 +17,8 @@ func CreateLeague(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	var league struct {
-		Name string `json:"name"`
+		Name        string `json:"name"`
+		Thaileageid *int   `json:"thaileageid"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&league); err != nil {
@@ -32,7 +33,13 @@ func CreateLeague(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create league in database
-	result, err := database.DB.Exec("INSERT INTO leagues (name) VALUES (?)", league.Name)
+	var result sql.Result
+	var err error
+	if league.Thaileageid != nil {
+		result, err = database.DB.Exec("INSERT INTO leagues (name, thaileageid) VALUES (?, ?)", league.Name, league.Thaileageid)
+	} else {
+		result, err = database.DB.Exec("INSERT INTO leagues (name) VALUES (?)", league.Name)
+	}
 	if err != nil {
 		log.Printf("Failed to create league: %v", err)
 		if isDuplicateEntry(err) {
@@ -47,6 +54,7 @@ func CreateLeague(w http.ResponseWriter, r *http.Request) {
 	createdLeague := map[string]interface{}{
 		"id":   id,
 		"name": league.Name,
+		"thaileageid": league.Thaileageid,
 	}
 
 	response := map[string]interface{}{
@@ -69,7 +77,8 @@ func UpdateLeague(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var league struct {
-		Name string `json:"name"`
+		Name        string `json:"name"`
+		Thaileageid *int   `json:"thaileageid"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&league); err != nil {
@@ -84,7 +93,12 @@ func UpdateLeague(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update league in database
-	result, err := database.DB.Exec("UPDATE leagues SET name = ? WHERE id = ?", league.Name, id)
+	var result sql.Result
+	if league.Thaileageid != nil {
+		result, err = database.DB.Exec("UPDATE leagues SET name = ?, thaileageid = ? WHERE id = ?", league.Name, league.Thaileageid, id)
+	} else {
+		result, err = database.DB.Exec("UPDATE leagues SET name = ?, thaileageid = NULL WHERE id = ?", league.Name, id)
+	}
 	if err != nil {
 		log.Printf("Failed to update league: %v", err)
 		if isDuplicateEntry(err) {
@@ -97,13 +111,20 @@ func UpdateLeague(w http.ResponseWriter, r *http.Request) {
 
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
-		http.Error(w, `{"success": false, "error": "League not found"}`, http.StatusNotFound)
-		return
+		// อาจเป็นเพราะข้อมูลเหมือนเดิม ให้เช็คว่ามี row นี้จริงไหม
+		var exists bool
+		err := database.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM leagues WHERE id = ?)", id).Scan(&exists)
+		if err != nil || !exists {
+			http.Error(w, `{"success": false, "error": "League not found"}`, http.StatusNotFound)
+			return
+		}
+		// ถ้ามี row จริง ให้ถือว่า success (ข้อมูลเหมือนเดิม)
 	}
 
 	updatedLeague := map[string]interface{}{
 		"id":   id,
 		"name": league.Name,
+		"thaileageid": league.Thaileageid,
 	}
 
 	response := map[string]interface{}{
@@ -171,10 +192,10 @@ func SearchLeagues(w http.ResponseWriter, r *http.Request) {
 	var args []interface{}
 
 	if searchTerm != "" {
-		query = "SELECT id, name FROM leagues WHERE name LIKE ? ORDER BY name"
+		query = "SELECT id, name, thaileageid FROM leagues WHERE name LIKE ? ORDER BY name"
 		args = append(args, "%"+searchTerm+"%")
 	} else {
-		query = "SELECT id, name FROM leagues ORDER BY name"
+		query = "SELECT id, name, thaileageid FROM leagues ORDER BY name"
 	}
 
 	rows, err := database.DB.Query(query, args...)
@@ -189,8 +210,9 @@ func SearchLeagues(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var id int
 		var name string
+		var thaileageid sql.NullInt64
 
-		if err := rows.Scan(&id, &name); err != nil {
+		if err := rows.Scan(&id, &name, &thaileageid); err != nil {
 			log.Printf("Failed to scan league row: %v", err)
 			continue
 		}
@@ -198,6 +220,7 @@ func SearchLeagues(w http.ResponseWriter, r *http.Request) {
 		leagues = append(leagues, map[string]interface{}{
 			"id":   id,
 			"name": name,
+			"thaileageid": func() interface{} { if thaileageid.Valid { return thaileageid.Int64 } else { return nil } }(),
 		})
 	}
 
