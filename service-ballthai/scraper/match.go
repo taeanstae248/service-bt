@@ -42,49 +42,25 @@ func scrapeMatchesByConfig(db *sql.DB, baseURL string, pages []int, tournamentPa
 					log.Printf("Warning: Failed to insert/update stage for match %d (%s): %v", apiMatch.ID, apiMatch.StageName, err)
 				}
 			}
-			// ดาวน์โหลดโลโก้ทีมเหย้า
-			homeLogoPath := ""
-			if apiMatch.HomeTeamLogo != "" {
-				downloadedPath, err := DownloadImage(apiMatch.HomeTeamLogo, "./img/source")
-				if err != nil {
-					log.Printf("Warning: Failed to download home team logo for match %d: %v", apiMatch.ID, err)
-				} else {
-					homeLogoPath = downloadedPath
-				}
-			}
+			   // ไม่ต้องดาวน์โหลดโลโก้ซ้ำที่นี่ เพราะ InsertOrUpdateTeam จะจัดการให้แล้ว
 
-			// ดาวน์โหลดโลโก้ทีมเยือน
-			awayLogoPath := ""
-			if apiMatch.AwayTeamLogo != "" {
-				downloadedPath, err := DownloadImage(apiMatch.AwayTeamLogo, "./img/source")
-				if err != nil {
-					log.Printf("Warning: Failed to download away team logo for match %d: %v", apiMatch.ID, err)
-				} else {
-					awayLogoPath = downloadedPath
-				}
-			}
+			   // รับ Home Team ID (หาเฉพาะใน DB ไม่ insert/update)
+			   homeTeamID := sql.NullInt64{Valid: false}
+			   if apiMatch.HomeTeamName != "" {
+				   tID, err := database.GetTeamIDByThaiName(db, apiMatch.HomeTeamName, "")
+				   if err == nil {
+					   homeTeamID = sql.NullInt64{Int64: int64(tID), Valid: true}
+				   }
+			   }
 
-			// รับ Home Team ID
-			homeTeamID := sql.NullInt64{Valid: false}
-			if apiMatch.HomeTeamName != "" {
-				tID, err := database.GetTeamIDByThaiName(db, apiMatch.HomeTeamName, homeLogoPath)
-				if err != nil {
-					log.Printf("Warning: Failed to get home team ID for match %d (%s): %v", apiMatch.ID, apiMatch.HomeTeamName, err)
-				} else {
-					homeTeamID = sql.NullInt64{Int64: int64(tID), Valid: true}
-				}
-			}
-
-			// รับ Away Team ID
-			awayTeamID := sql.NullInt64{Valid: false}
-			if apiMatch.AwayTeamName != "" {
-				tID, err := database.GetTeamIDByThaiName(db, apiMatch.AwayTeamName, awayLogoPath)
-				if err != nil {
-					log.Printf("Warning: Failed to get away team ID for match %d (%s): %v", apiMatch.ID, apiMatch.AwayTeamName, err)
-				} else {
-					awayTeamID = sql.NullInt64{Int64: int64(tID), Valid: true}
-				}
-			}
+			   // รับ Away Team ID (หาเฉพาะใน DB ไม่ insert/update)
+			   awayTeamID := sql.NullInt64{Valid: false}
+			   if apiMatch.AwayTeamName != "" {
+				   tID, err := database.GetTeamIDByThaiName(db, apiMatch.AwayTeamName, "")
+				   if err == nil {
+					   awayTeamID = sql.NullInt64{Int64: int64(tID), Valid: true}
+				   }
+			   }
 
 			// รับ Channel ID (Main TV)
 			channelID := sql.NullInt64{Valid: false}
@@ -179,7 +155,7 @@ func ScrapeThaileagueMatches(db *sql.DB, targetLeague string) error { // เพ�
 		}
 	case "t2":
 		log.Println("Scraping Thai League 2 (T2) Matches...")
-		if err := scrapeMatchesByConfig(db, baseURL, singlePage, "&tournament=196", "T2", 2); err != nil { // แมปกับ DB league ID สำหรับ T2
+		if err := scrapeMatchesByConfig(db, baseURL, singlePage, "&tournament=208", "T2", 2); err != nil { // แมปกับ DB league ID สำหรับ T2
 			return fmt.Errorf("failed to scrape T2 matches: %w", err)
 		}
 	case "t3_BKK":
