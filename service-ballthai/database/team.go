@@ -46,45 +46,45 @@ func GetTeamIDByThaiName(db *sql.DB, teamNameThai, teamLogoURL string) (int, err
 	return teamID, nil
 }
 
-// InsertOrUpdateTeam inserts or updates a team record in the database
+// InsertOrUpdateTeam inserts or updates a team record in the database (ใช้ name_th แทน team_ref_id)
 func InsertOrUpdateTeam(db *sql.DB, team models.TeamDB) error {
 	var existingTeamID int
-	query := "SELECT id FROM teams WHERE team_ref_id = ?"
-	err := db.QueryRow(query, team.TeamRefID).Scan(&existingTeamID)
+	query := "SELECT id FROM teams WHERE name_th = ?"
+	err := db.QueryRow(query, team.NameTH).Scan(&existingTeamID)
 
 	if err == sql.ErrNoRows {
 		// Insert new team
 		insertQuery := `
 			INSERT INTO teams (
-				team_ref_id, name_th, name_en, logo_url,
-				team_post_ballthai, website, shop, stadium_id, league_id
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+				name_th, name_en, logo_url,
+				team_post_ballthai, website, shop, stadium_id
+			) VALUES (?, ?, ?, ?, ?, ?, ?)
 		`
 		_, err := db.Exec(insertQuery,
-			team.TeamRefID, team.NameTH, team.NameEN, team.LogoURL,
-			team.TeamPostBallthai, team.Website, team.Shop, team.StadiumID, team.LeagueID,
+			team.NameTH, team.NameEN, team.LogoURL,
+			team.TeamPostBallthai, team.Website, team.Shop, team.StadiumID,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to insert team %s: %w", team.NameTH, err)
 		}
 		log.Printf("Inserted new team: %s", team.NameTH)
 	} else if err != nil {
-		return fmt.Errorf("failed to query existing team %d: %w", team.TeamRefID, err)
+		return fmt.Errorf("failed to query existing team %s: %w", team.NameTH, err)
 	} else {
 		// Update existing team
 		updateQuery := `
 			UPDATE teams SET
-				name_th = ?, name_en = ?, logo_url = ?,
-				team_post_ballthai = ?, website = ?, shop = ?, stadium_id = ?, league_id = ?
-			WHERE team_ref_id = ?
+				name_en = ?, logo_url = ?,
+				team_post_ballthai = ?, website = ?, shop = ?, stadium_id = ?
+			WHERE id = ?
 		`
 		_, err := db.Exec(updateQuery,
-			team.NameTH, team.NameEN, team.LogoURL,
-			team.TeamPostBallthai, team.Website, team.Shop, team.StadiumID, team.LeagueID,
-			team.TeamRefID,
+			team.NameEN, team.LogoURL,
+			team.TeamPostBallthai, team.Website, team.Shop, team.StadiumID,
+			existingTeamID,
 		)
 		if err != nil {
-			return fmt.Errorf("failed to update team %d: %w", team.TeamRefID, err)
+			return fmt.Errorf("failed to update team %s: %w", team.NameTH, err)
 		}
 		log.Printf("Updated existing team: %s (ID: %d)", team.NameTH, existingTeamID)
 	}

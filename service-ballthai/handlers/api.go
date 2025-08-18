@@ -238,34 +238,6 @@ func SetDB(database *sql.DB) {
 }
 
 // GetLeagues returns all leagues
-func GetLeagues(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	query := "SELECT id, name FROM leagues ORDER BY name"
-	rows, err := DB.Query(query)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
-		return
-	}
-	defer rows.Close()
-
-	var leagues []League
-	for rows.Next() {
-		var league League
-		if err := rows.Scan(&league.ID, &league.Name); err != nil {
-			http.Error(w, fmt.Sprintf("Scan error: %v", err), http.StatusInternalServerError)
-			return
-		}
-		leagues = append(leagues, league)
-	}
-
-	response := APIResponse{
-		Success: true,
-		Data:    leagues,
-	}
-
-	json.NewEncoder(w).Encode(response)
-}
 
 // GetTeams returns all teams
 func GetTeams(w http.ResponseWriter, r *http.Request) {

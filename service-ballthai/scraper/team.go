@@ -79,3 +79,29 @@ func UpdateTeamPostBallthai(db *sql.DB) error {
 	log.Printf("Team post ID update process finished. Total teams updated: %d", updatedCount)
 	return nil
 }
+
+// FetchTeamsByLeagueID ดึงข้อมูลทีมจาก API ตาม league id ที่ส่งเข้าไป
+func FetchTeamsByLeagueID(leagueID string) ([]models.TeamAPI, error) {
+	url := "https://competition.tl.prod.c0d1um.io/thaileague/api/tournament-team-dropdown-public/?tournament=" + leagueID
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch teams: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API returned status: %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	var teams []models.TeamAPI
+	if err := json.Unmarshal(body, &teams); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
+	}
+
+	return teams, nil
+}

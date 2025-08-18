@@ -130,7 +130,6 @@ async function searchLeagues() {
 
 function renderLeagues(leaguesList) {
     const container = document.getElementById('leaguesGrid');
-    
     if (!leaguesList || leaguesList.length === 0) {
         container.innerHTML = `
             <div class="empty-state">
@@ -141,7 +140,6 @@ function renderLeagues(leaguesList) {
         `;
         return;
     }
-
     container.innerHTML = leaguesList.map(league => `
         <div class="league-card">
             <div class="league-info">
@@ -151,6 +149,7 @@ function renderLeagues(leaguesList) {
             <div class="league-actions">
                 <button onclick="editLeague(${league.id})" class="btn btn-edit">แก้ไข</button>
                 <button onclick="deleteLeague(${league.id})" class="btn btn-delete">ลบ</button>
+                <button onclick="fetchTeamsForLeague('${league.thaileageid || ''}', this)" class="btn btn-secondary" ${!league.thaileageid ? 'disabled' : ''}>ดึงทีม</button>
             </div>
         </div>
     `).join('');
@@ -272,6 +271,32 @@ async function confirmDelete() {
         console.error('Error deleting league:', error);
         showAlert('เกิดข้อผิดพลาดในการเชื่อมต่อ', 'error');
     } finally {
+        showLoading(false);
+    }
+}
+
+async function fetchTeamsForLeague(thaileageid, btn) {
+    if (!thaileageid) {
+        showAlert('ลีกนี้ไม่มี thaileageid', 'error');
+        return;
+    }
+    btn.disabled = true;
+    const oldText = btn.textContent;
+    btn.textContent = 'กำลังโหลด...';
+    showLoading(true);
+    try {
+        const response = await fetch(`/scrape/teams/${thaileageid}`);
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.errors ? data.errors.join(', ') : 'API error');
+        showAlert(`ดึงทีมสำเร็จ (${data.imported} ทีม)`, 'success');
+        if (data.errors && data.errors.length > 0) {
+            showAlert('บางทีมบันทึกไม่สำเร็จ: ' + data.errors.join(', '), 'error');
+        }
+    } catch (e) {
+        showAlert('ดึงทีมไม่สำเร็จ: ' + (e.message || ''), 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = oldText;
         showLoading(false);
     }
 }

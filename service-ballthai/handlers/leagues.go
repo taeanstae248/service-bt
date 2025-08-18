@@ -232,6 +232,44 @@ func SearchLeagues(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+// GetLeagues ดึงข้อมูลลีกทั้งหมด (พร้อม thaileageid)
+func GetLeagues(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	rows, err := database.DB.Query("SELECT id, name, thaileageid FROM leagues ORDER BY name")
+	if err != nil {
+		log.Printf("Failed to get leagues: %v", err)
+		http.Error(w, `{"success": false, "error": "Failed to get leagues"}`, http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var leagues []map[string]interface{}
+	for rows.Next() {
+		var id int
+		var name string
+		var thaileageid sql.NullInt64
+
+		if err := rows.Scan(&id, &name, &thaileageid); err != nil {
+			log.Printf("Failed to scan league row: %v", err)
+			continue
+		}
+
+		leagues = append(leagues, map[string]interface{}{
+			"id":   id,
+			"name": name,
+			"thaileageid": func() interface{} { if thaileageid.Valid { return thaileageid.Int64 } else { return nil } }(),
+		})
+	}
+
+	response := map[string]interface{}{
+		"success": true,
+		"data":    leagues,
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
 // Helper function to check for duplicate entry errors
 func isDuplicateEntry(err error) bool {
 	return err != nil && (

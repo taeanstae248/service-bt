@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
 	"log"
 	"net/http"
 	"html/template"
@@ -14,6 +15,8 @@ import (
 	"go-ballthai-scraper/database"
 	"go-ballthai-scraper/handlers"
 	"go-ballthai-scraper/middleware"
+	"go-ballthai-scraper/scraper"
+	"go-ballthai-scraper/models"
 )
 
 func main() {
@@ -85,7 +88,7 @@ func main() {
 	router.HandleFunc("/api/players", handlers.GetPlayers).Methods("GET")
 	router.HandleFunc("/api/players/team/{team_id}", handlers.GetPlayersByTeamID).Methods("GET")
 	router.HandleFunc("/api/players/team-post/{team_post_id}", handlers.GetPlayersByTeamPost).Methods("GET")
-router.HandleFunc("/api/players/{id:[0-9]+}", handlers.UpdatePlayer).Methods("PUT")
+	router.HandleFunc("/api/players/{id:[0-9]+}", handlers.UpdatePlayer).Methods("PUT")
 	router.HandleFunc("/players.html", func(w http.ResponseWriter, r *http.Request) {
 		db := database.DB
 		if db == nil {
@@ -220,6 +223,49 @@ router.HandleFunc("/api/players/{id:[0-9]+}", handlers.UpdatePlayer).Methods("PU
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login.html", http.StatusFound)
 	})
+
+	// เพิ่ม route สำหรับ scrape teams by leagueid (บันทึกลง database ด้วย)
+	router.HandleFunc("/scrape/teams/{leagueid}", func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		leagueID := vars["leagueid"]
+		teams, err := scraper.FetchTeamsByLeagueID(leagueID)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		// ดึง db จาก database.DB
+		db := database.DB
+		if db == nil {
+			http.Error(w, "Database not initialized", 500)
+			return
+		}
+		imported := 0
+		errors := []string{}
+		for _, t := range teams {
+			teamDB := models.TeamDB{
+				TeamRefID:        sql.NullInt64{Int64: int64(t.ID), Valid: true},
+				NameTH:           t.Name,
+				NameEN:           sql.NullString{String: t.NameEN, Valid: t.NameEN != ""},
+				LogoURL:          sql.NullString{String: t.Logo, Valid: t.Logo != ""},
+				Website:          sql.NullString{String: t.Website, Valid: t.Website != ""},
+				Shop:             sql.NullString{String: t.Shop, Valid: t.Shop != ""},
+				StadiumID:        sql.NullInt64{Valid: false}, // ต้อง mapping stadium เพิ่มถ้าต้องการ
+				LeagueID:         sql.NullInt64{Valid: false}, // สามารถใส่ league id ที่ map กับ thaileageid ได้
+			}
+			err := database.InsertOrUpdateTeam(db, teamDB)
+			if err != nil {
+				errors = append(errors, t.Name+": "+err.Error())
+				continue
+			}
+			imported++
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"imported": imported,
+			"errors": errors,
+		})
+	}).Methods("GET")
 
 	// Start server
 	port := ":" + cfg.ServerPort
