@@ -3,11 +3,20 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"io"
 	"log"
-	// "strings" // ลบออก: ไม่ได้ใช้ strings ในไฟล์นี้แล้ว
+	"net/http"
+	"os"
+	"path"
+	"strings"
 
 	"go-ballthai-scraper/models" // ตรวจสอบให้แน่ใจว่าชื่อโมดูลตรงกับ go.mod ของคุณ
 )
+
+func init() {
+	// สร้างโฟลเดอร์ img/teams ถ้ายังไม่มี
+	os.MkdirAll("img/teams", os.ModePerm)
+}
 
 // GetTeamIDByThaiName checks if team exists by Thai name, inserts if not, and returns ID
 func GetTeamIDByThaiName(db *sql.DB, teamNameThai, teamLogoURL string) (int, error) {
@@ -52,6 +61,36 @@ func InsertOrUpdateTeam(db *sql.DB, team models.TeamDB) error {
 	query := "SELECT id FROM teams WHERE name_th = ?"
 	err := db.QueryRow(query, team.NameTH).Scan(&existingTeamID)
 
+	// เตรียมตัวแปรโลโก้ให้พร้อมใช้
+	logoFileName := ""
+	logoDBPath := ""
+	if team.LogoURL.Valid && team.LogoURL.String != "" {
+		resp, err := http.Get(team.LogoURL.String)
+		if err == nil {
+			defer resp.Body.Close()
+			if resp.StatusCode == 200 {
+				ext := path.Ext(team.LogoURL.String)
+				baseName := team.NameEN.String
+				if baseName == "" {
+					baseName = team.NameTH
+				}
+				if baseName == "" {
+					baseName = "team"
+				}
+				logoFileName = fmt.Sprintf("%s%s", baseName, ext)
+				logoFileName = sanitizeFileName(logoFileName)
+				f, err := os.Create(path.Join("img/teams", logoFileName))
+				if err == nil {
+					io.Copy(f, resp.Body)
+					f.Close()
+				}
+			}
+		}
+	}
+	if logoFileName != "" {
+		logoDBPath = "/img/teams/" + logoFileName
+	}
+
 	if err == sql.ErrNoRows {
 		// Insert new team
 		insertQuery := `
@@ -61,7 +100,7 @@ func InsertOrUpdateTeam(db *sql.DB, team models.TeamDB) error {
 			) VALUES (?, ?, ?, ?, ?, ?, ?)
 		`
 		_, err := db.Exec(insertQuery,
-			team.NameTH, team.NameEN, team.LogoURL,
+			team.NameTH, team.NameEN, sql.NullString{String: logoDBPath, Valid: logoDBPath != ""},
 			team.TeamPostBallthai, team.Website, team.Shop, team.StadiumID,
 		)
 		if err != nil {
@@ -79,7 +118,7 @@ func InsertOrUpdateTeam(db *sql.DB, team models.TeamDB) error {
 			WHERE id = ?
 		`
 		_, err := db.Exec(updateQuery,
-			team.NameEN, team.LogoURL,
+			team.NameEN, sql.NullString{String: logoDBPath, Valid: logoDBPath != ""},
 			team.TeamPostBallthai, team.Website, team.Shop, team.StadiumID,
 			existingTeamID,
 		)
@@ -89,4 +128,12 @@ func InsertOrUpdateTeam(db *sql.DB, team models.TeamDB) error {
 		log.Printf("Updated existing team: %s (ID: %d)", team.NameTH, existingTeamID)
 	}
 	return nil
+}
+
+// ฟังก์ชันช่วย sanitize ชื่อไฟล์
+func sanitizeFileName(name string) string {
+	name = strings.ReplaceAll(name, " ", "_")
+	name = strings.ReplaceAll(name, "/", "_")
+	name = strings.ReplaceAll(name, "\\", "_")
+	return name
 }
