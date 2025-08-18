@@ -81,7 +81,16 @@ async function renderStandingsTableWithStage(standings, stagesData) {
         <thead><tr>
             <th>ลำดับ</th><th>ทีม</th><th>แข่ง</th><th>ชนะ</th><th>เสมอ</th><th>แพ้</th><th>ได้</th><th>เสีย</th><th>ผลต่าง</th><th>แต้ม</th><th>เลื่อน</th><th>จัดการ</th>
         </tr></thead><tbody>`;
-    filtered.sort((a,b) => (a.current_rank?.Int64||0)-(b.current_rank?.Int64||0));
+    filtered.sort((a, b) => {
+        // รองรับ current_rank ทั้ง Int64, int, null, undefined
+        const ra = (a.current_rank && typeof a.current_rank === 'object' && a.current_rank.Int64 !== undefined)
+            ? a.current_rank.Int64
+            : (typeof a.current_rank === 'number' ? a.current_rank : 9999);
+        const rb = (b.current_rank && typeof b.current_rank === 'object' && b.current_rank.Int64 !== undefined)
+            ? b.current_rank.Int64
+            : (typeof b.current_rank === 'number' ? b.current_rank : 9999);
+        return ra - rb;
+    });
     filtered.forEach((s,i) => {
         html += `<tr data-id="${s.id}" data-rank="${s.current_rank?.Int64||i+1}">
             <td>${s.current_rank?.Int64||i+1}</td>
@@ -168,8 +177,8 @@ function showEditStandingModal(standing) {
             <label>อันดับ: <input type="number" name="current_rank" value="${standing.current_rank?.Int64||1}" min="1" required></label><br><br>
             <label>สถานะ: 
                 <select name="status" required>
-                    <option value="1" ${standing.status?.Int64==1?'selected':''}>ON</option>
-                    <option value="0" ${standing.status?.Int64==0?'selected':''}>OFF</option>
+                    <option value="1" ${standing.status?.Int64==1?'selected':''}>ON - เปิดการดึง</option>
+                    <option value="0" ${standing.status?.Int64==0?'selected':''}>OFF - ปิดการดึง</option>
                 </select>
             </label><br><br>
             <div style="text-align:right">

@@ -64,27 +64,37 @@ func ScrapeStandings(db *sql.DB) error {
 					stageID = sql.NullInt64{Int64: int64(id), Valid: true}
 				}
 			}
-			standingDB := models.StandingDB{
-				LeagueID:       config.LeagueID,
-				TeamID:         teamID,
-				MatchesPlayed:  apiStanding.MatchPlay,
-				Wins:           apiStanding.Win,
-				Draws:          apiStanding.Draw,
-				Losses:         apiStanding.Lose,
-				GoalsFor:       apiStanding.GoalFor,
-				GoalsAgainst:   apiStanding.GoalAgainst,
-				GoalDifference: apiStanding.GoalDifference,
-				Points:         apiStanding.Point,
-				CurrentRank:    sql.NullInt64{Int64: int64(apiStanding.CurrentRank), Valid: apiStanding.CurrentRank != 0},
-				Status:         sql.NullInt64{Valid: false},
-				StageID:        stageID,
-			}
+			   standingDB := models.StandingDB{
+				   LeagueID:       config.LeagueID,
+				   TeamID:         teamID,
+				   MatchesPlayed:  apiStanding.MatchPlay,
+				   Wins:           apiStanding.Win,
+				   Draws:          apiStanding.Draw,
+				   Losses:         apiStanding.Lose,
+				   GoalsFor:       apiStanding.GoalFor,
+				   GoalsAgainst:   apiStanding.GoalAgainst,
+				   GoalDifference: apiStanding.GoalDifference,
+				   Points:         apiStanding.Point,
+				   CurrentRank:    sql.NullInt64{Int64: int64(apiStanding.CurrentRank), Valid: apiStanding.CurrentRank != 0},
+				   Status:         sql.NullInt64{Valid: false},
+				   StageID:        stageID,
+			   }
 
-			// แทรกหรืออัปเดตตารางคะแนนใน DB
-			err = database.InsertOrUpdateStanding(db, standingDB)
-			if err != nil {
-				log.Printf("Error saving standing for team %s in league %s to DB: %v", apiStanding.TournamentTeamName, configName, err)
-			}
+			   // เช็ค status ก่อนอัปเดต: ถ้า status=0 (OFF) ข้าม ไม่อัปเดต/insert
+			   status, err := database.GetStandingStatus(db, config.LeagueID, teamID, stageID)
+			   if err != nil {
+				   log.Printf("Error checking standing status for team %s: %v", apiStanding.TournamentTeamName, err)
+				   continue
+			   }
+			   if status.Valid && status.Int64 == 0 {
+				   log.Printf("Skip update standing for team %s (status=0/OFF)", apiStanding.TournamentTeamName)
+				   continue
+			   }
+			   // ถ้าไม่มี row หรือ status=1 (ON) ให้บันทึก/อัปเดตได้
+			   err = database.InsertOrUpdateStanding(db, standingDB)
+			   if err != nil {
+				   log.Printf("Error saving standing for team %s in league %s to DB: %v", apiStanding.TournamentTeamName, configName, err)
+			   }
 		}
 	}
 	return nil

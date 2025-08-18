@@ -1,17 +1,46 @@
+
 package database
 
 import (
-   "database/sql"
-   "fmt"
-   "go-ballthai-scraper/models"
-   "log"
+	"database/sql"
+	"fmt"
+	"go-ballthai-scraper/models"
+	"log"
 )
+
+// GetStandingStatus คืนค่า status (int) ของ standings ตาม league_id, team_id, stage_id (nullable)
+func GetStandingStatus(db *sql.DB, leagueID, teamID int, stageID sql.NullInt64) (sql.NullInt64, error) {
+   var status sql.NullInt64
+   var err error
+   if stageID.Valid {
+	   err = db.QueryRow("SELECT status FROM standings WHERE league_id=? AND team_id=? AND stage_id=?", leagueID, teamID, stageID.Int64).Scan(&status)
+   } else {
+	   err = db.QueryRow("SELECT status FROM standings WHERE league_id=? AND team_id=? AND stage_id IS NULL", leagueID, teamID).Scan(&status)
+   }
+   if err == sql.ErrNoRows {
+	   return sql.NullInt64{Valid: false}, nil // ไม่มี row
+   }
+   return status, err
+}
+
+
 
 // UpdateStandingRankByID อัปเดต current_rank ของ standing ตาม id
 func UpdateStandingRankByID(db *sql.DB, id int, currentRank int) error {
-	q := `UPDATE standings SET current_rank=? WHERE id=?`
-	_, err := db.Exec(q, currentRank, id)
-	return err
+	// update current_rank เฉพาะ status != 0 (ON) โดย WHERE แค่ id
+	q := `UPDATE standings SET current_rank=? WHERE id=? AND (status IS NULL OR status != 0)`
+	res, err := db.Exec(q, sql.NullInt64{Int64: int64(currentRank), Valid: true}, id)
+	if err != nil {
+		log.Printf("[UpdateStandingRankByID] ERROR: id=%d, currentRank=%d, err=%v", id, currentRank, err)
+		return err
+	}
+	n, _ := res.RowsAffected()
+	log.Printf("[UpdateStandingRankByID] id=%d, currentRank=%d, rowsAffected=%d", id, currentRank, n)
+	if n == 0 {
+		// ไม่อัปเดตถ้า status = 0
+		return nil
+	}
+	return nil
 }
 
 func UpdateStandingByID(db *sql.DB, id int, standing models.StandingDB) error {
@@ -31,7 +60,7 @@ func UpdateStandingByID(db *sql.DB, id int, standing models.StandingDB) error {
 
 // GetStandingsByLeagueID คืน standings ทั้งหมดของลีกที่ระบุ
 func GetStandingsByLeagueID(db *sql.DB, leagueID int) ([]models.StandingDB, error) {
-	rows, err := db.Query(`SELECT s.id, s.league_id, s.team_id, t.name_th as team_name, s.stage_id, s.status, s.matches_played, s.wins, s.draws, s.losses, s.goals_for, s.goals_against, s.goal_difference, s.points, s.current_rank FROM standings s LEFT JOIN teams t ON s.team_id = t.id WHERE s.league_id = ? ORDER BY s.points DESC, s.goal_difference DESC, s.wins DESC`, leagueID)
+		rows, err := db.Query(`SELECT s.id, s.league_id, s.team_id, t.name_th as team_name, s.stage_id, s.status, s.matches_played, s.wins, s.draws, s.losses, s.goals_for, s.goals_against, s.goal_difference, s.points, s.current_rank FROM standings s LEFT JOIN teams t ON s.team_id = t.id WHERE s.league_id = ? ORDER BY s.current_rank ASC, s.id ASC`, leagueID)
 	if err != nil {
 		return nil, err
 	}
