@@ -1,14 +1,9 @@
--- schema.sql
--- ไฟล์นี้รวบรวมคำสั่ง SQL สำหรับสร้างตารางฐานข้อมูลทั้งหมด
-
 -- 1. สร้างตาราง leagues (ลีก)
 -- ตารางนี้เก็บข้อมูลลีกต่างๆ
 CREATE TABLE IF NOT EXISTS `leagues` (
     `id` INT PRIMARY KEY AUTO_INCREMENT,
     `name` VARCHAR(255) NOT NULL UNIQUE,
-    `thaileageid` INT UNIQUE,
-    `thaileageseason` VARCHAR(32), 
-    `thaileagename` VARCHAR(255)
+    `thaileageid` INT UNIQUE
 );
 
 -- เพิ่มข้อมูลลีกตัวอย่าง
@@ -168,3 +163,14 @@ CREATE TABLE IF NOT EXISTS `matches` (
 ALTER TABLE `stadiums` ADD CONSTRAINT `fk_stadiums_team_id` FOREIGN KEY (`team_id`) REFERENCES `teams`(`id`);
 ALTER TABLE `teams` ADD CONSTRAINT `fk_teams_stadium_id` FOREIGN KEY (`stadium_id`) REFERENCES `stadiums`(`id`);
 
+-- 11. สร้างตาราง seasons (ฤดูกาล)
+CREATE TABLE IF NOT EXISTS seasons (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    league_id INT NOT NULL,
+    season_year VARCHAR(20) NOT NULL,
+    start_date DATE,
+    end_date DATE,
+    FOREIGN KEY (league_id) REFERENCES leagues(id)
+);
+-- schema.sql
+-- ไฟล์นี้รวบรวมคำสั่ง SQL สำหรับสร้างตารางฐานข้อมูลทั้งหมด
