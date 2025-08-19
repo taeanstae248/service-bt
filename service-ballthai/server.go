@@ -1,24 +1,4 @@
 package main
-
-import (
-	"database/sql"
-	"encoding/json"
-	"log"
-	"net/http"
-	"html/template"
-	"strings"
-
-	_ "github.com/go-sql-driver/mysql"
-	"github.com/gorilla/mux"
-
-	"go-ballthai-scraper/config"
-	"go-ballthai-scraper/database"
-	"go-ballthai-scraper/handlers"
-	"go-ballthai-scraper/middleware"
-	"go-ballthai-scraper/scraper"
-	"go-ballthai-scraper/models"
-)
-
 // scrapePostHandler ดึงข้อมูลจาก serviceseoball.com แล้วส่งต่อให้ client
 import (
 	"database/sql"
