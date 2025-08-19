@@ -188,7 +188,18 @@ func startAPIServer() {
 	c := cors.AllowAll()
 	handler := c.Handler(router)
 
-	log.Println("Starting API server on :8080")
+	// Read host/port from environment
+	host := os.Getenv("API_HOST")
+	if host == "" {
+		host = "0.0.0.0"
+	}
+	port := os.Getenv("API_PORT")
+	if port == "" {
+		port = "8080"
+	}
+	addr := host + ":" + port
+
+	log.Printf("Starting API server on %s", addr)
 	log.Println("API endpoints available:")
 	log.Println("  POST /api/auth/login - User login")
 	log.Println("  POST /api/auth/logout - User logout")
@@ -204,7 +215,7 @@ func startAPIServer() {
 	log.Println("  GET  /images/{path} - Serve static images")
 	log.Println("  GET  / - Serve static files (login.html, dashboard.html)")
 
-	log.Fatal(http.ListenAndServe(":8080", handler))
+	log.Fatal(http.ListenAndServe(addr, handler))
 }
 
 // Authentication handlers
