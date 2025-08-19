@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"html/template"
 	"strings"
+	"os"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/mux"
@@ -16,8 +17,8 @@ import (
 	"go-ballthai-scraper/handlers"
 	"go-ballthai-scraper/middleware"
 	"go-ballthai-scraper/scraper"
-		"go-ballthai-scraper/models"
-	)
+	"go-ballthai-scraper/models"
+)
 
 	// scrapePostHandler ดึงข้อมูลจาก serviceseoball.com แล้วส่งต่อให้ client
 	func scrapePostHandler(w http.ResponseWriter, r *http.Request) {
