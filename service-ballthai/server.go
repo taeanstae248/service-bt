@@ -302,8 +302,26 @@ func main() {
 	}).Methods("GET")
 
 	// Start server
-	port := ":" + cfg.ServerPort
-	log.Printf("Server starting on port %s", cfg.ServerPort)
-	log.Printf("Access the application at: http://localhost%s", port)
-	log.Fatal(http.ListenAndServe(port, router))
+	// โหลด environment variables
+	import (
+	    "os"
+	    "log"
+	    // ...existing import...
+	)
+
+	// อ่าน host/port จาก environment
+	host := os.Getenv("API_HOST")
+	if host == "" {
+	    host = "0.0.0.0"
+	}
+	port := os.Getenv("API_PORT")
+	if port == "" {
+	    port = "8080"
+	}
+	addr := host + ":" + port
+	log.Printf("Starting server on %s", addr)
+	// ...existing code...
+	log.Fatal(http.ListenAndServe(addr, router))
+	
+	// Start server
 }
