@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+	"strings"
 
 	"github.com/gorilla/mux"
 )
@@ -436,6 +437,8 @@ func CreateMatch(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
 }
 func GetMatches(w http.ResponseWriter, r *http.Request) {
+	seasonName := r.URL.Query().Get("season")
+	resultStr := r.URL.Query().Get("result")
 	w.Header().Set("Content-Type", "application/json")
 
 	// Get query parameters
@@ -443,6 +446,20 @@ func GetMatches(w http.ResponseWriter, r *http.Request) {
 	offsetStr := r.URL.Query().Get("offset")
 	leagueIDStr := r.URL.Query().Get("league_id")
 	leagueName := r.URL.Query().Get("league")
+
+	// Map league short code (t1, t2, t3, t4) to full name if needed
+	leagueCodeMap := map[string]string{
+		"t1": "ไทยลีก 1",
+		"t2": "ไทยลีก 2",
+		"t3": "ไทยลีก 3",
+		"fa": "FA Cup",
+		"league_cup": "League Cup",
+		"bgc": "BGC Cup",
+		"samipro": "Samipro",
+	}
+	if val, ok := leagueCodeMap[strings.ToLower(leagueName)]; ok {
+		leagueName = val
+	}
 	// scoreOnly := r.URL.Query().Get("score") // ไม่ได้ใช้งาน
 	dateStr := r.URL.Query().Get("date")
 
@@ -462,6 +479,17 @@ func GetMatches(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// ถ้ามี season ให้ดึงช่วงวันที่จาก seasons ก่อน แล้วนำไป filter matches
+	var seasonStart, seasonEnd string
+	if seasonName != "" {
+		row := DB.QueryRow("SELECT season_start_date, season_end_date FROM seasons WHERE name = ?", seasonName)
+		err := row.Scan(&seasonStart, &seasonEnd)
+		if err != nil {
+			http.Error(w, "ไม่พบข้อมูลซีซั่นหรือช่วงวันที่: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
 	query := `
 		 SELECT m.id, ht.name_th as home_team, at.name_th as away_team, 
 			 m.home_score, m.away_score, m.start_date, m.start_time, s.name as stadium,
@@ -474,6 +502,11 @@ func GetMatches(w http.ResponseWriter, r *http.Request) {
 		 LEFT JOIN leagues l ON m.league_id = l.id
 		 WHERE 1=1
 	`
+	// Filter by season date range (ถ้ามี season)
+	if seasonName != "" {
+		query += " AND m.start_date >= ? AND m.start_date <= ?"
+		args = append(args, seasonStart, seasonEnd)
+	}
 
 	// Add league_id filter
 	if leagueIDStr != "" {
@@ -496,12 +529,19 @@ func GetMatches(w http.ResponseWriter, r *http.Request) {
 	if dateStr != "" {
 		query += " AND DATE(m.start_date) = ?"
 		args = append(args, dateStr)
+	} else if resultStr == "1" {
+		// ถ้า result=1 ให้แสดง match ที่ start_date <= วันนี้ (ผลบอล)
+		query += " AND DATE(m.start_date) <= CURDATE()"
 	} else {
-		// ถ้าไม่ส่ง date ให้แสดงเฉพาะวันปัจจุบัน
-		query += " AND DATE(m.start_date) = CURDATE()"
+		// ถ้าไม่ส่ง date และไม่ใช่ result=1 ให้แสดง match ที่ start_date >= วันนี้ (อนาคต)
+		query += " AND DATE(m.start_date) >= CURDATE()"
 	}
 
-	query += " ORDER BY m.start_date DESC LIMIT ? OFFSET ?"
+	if resultStr == "1" {
+		query += " ORDER BY m.start_date DESC LIMIT ? OFFSET ?"
+	} else {
+		query += " ORDER BY m.start_date ASC LIMIT ? OFFSET ?"
+	}
 	args = append(args, limit, offset)
 
 	rows, err := DB.Query(query, args...)
