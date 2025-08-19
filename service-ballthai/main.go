@@ -22,22 +22,33 @@ func main() {
 // ...existing code...
        r := mux.NewRouter()
 
-       // Debug: เพิ่ม route debug เพื่อตรวจสอบ server
-       r.HandleFunc("/debug", func(w http.ResponseWriter, r *http.Request) {
-	       w.Write([]byte("debug ok"))
-       })
+	// Debug: เพิ่ม route debug เพื่อตรวจสอบ server
+	r.HandleFunc("/debug", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("debug ok"))
+	})
 
-       // Scraper: เพิ่ม route สำหรับ trigger J-League Scraper (GET/POST)
-       r.HandleFunc("/scraper/jleague", handlers.ScrapeJLeagueHandler).Methods("GET", "POST")
+	// Scraper: เพิ่ม route สำหรับ trigger J-League Scraper (GET/POST)
+	r.HandleFunc("/scraper/jleague", handlers.ScrapeJLeagueHandler).Methods("GET", "POST")
 
-       // Debug: log routes ทั้งหมด
-       log.Println("[DEBUG] Registered routes:")
-       r.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
-	       tmpl, _ := route.GetPathTemplate()
-	       methods, _ := route.GetMethods()
-	       log.Printf("[DEBUG] Route: %s %v", tmpl, methods)
-	       return nil
-       })
+	// Scraper: เพิ่ม route สำหรับ trigger UpdateTeamPostBallthai (GET)
+	r.HandleFunc("/scraper/team-post-ballthai", func(w http.ResponseWriter, r *http.Request) {
+		err := scraper.UpdateTeamPostBallthai(db)
+		if err != nil {
+			log.Printf("[ERROR] UpdateTeamPostBallthai: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Write([]byte("Update team_post_ballthai completed!"))
+	}).Methods("GET")
+
+	// Debug: log routes ทั้งหมด
+	log.Println("[DEBUG] Registered routes:")
+	r.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
+		tmpl, _ := route.GetPathTemplate()
+		methods, _ := route.GetMethods()
+		log.Printf("[DEBUG] Route: %s %v", tmpl, methods)
+		return nil
+	})
 	log.Println("BallThai service starting...") // เพิ่ม log ตรงนี้
 
 	// Load values from .env file
@@ -84,8 +95,6 @@ func main() {
 
 	log.Println("Database connection successful!")
 	log.Println("Successfully connected to the database!")
-
-	r := mux.NewRouter()
 
 	// Register match routes (ลำดับสำคัญ: /api/matches/{id:[0-9]+} ต้องมาก่อน /api/matches)
 	r.HandleFunc("/api/matches/{id:[0-9]+}", handlers.MatchGetByIDHandler(db)).Methods("GET")

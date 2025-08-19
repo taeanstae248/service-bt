@@ -1,4 +1,7 @@
+
+
 package main
+
 
 import (
 	"database/sql"
@@ -16,16 +19,46 @@ import (
 	"go-ballthai-scraper/handlers"
 	"go-ballthai-scraper/middleware"
 	"go-ballthai-scraper/scraper"
-	"go-ballthai-scraper/models"
-)
+		"go-ballthai-scraper/models"
+	)
+
+	// scrapePostHandler ดึงข้อมูลจาก serviceseoball.com แล้วส่งต่อให้ client
+	func scrapePostHandler(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		w.Write([]byte("This is /scrape/post endpoint (no external fetch)."))
+	}
 
 func main() {
+	// ประกาศตัวแปร db และ err
+	var db *sql.DB
+	var err error
+
+	// Create router
+	router := mux.NewRouter()
+
+	// เพิ่ม route สำหรับอัปเดต team_post_ballthai
+	router.HandleFunc("/scraper/team-post-ballthai", func(w http.ResponseWriter, r *http.Request) {
+		db := database.DB
+		if db == nil {
+			http.Error(w, "Database not initialized", http.StatusInternalServerError)
+			return
+		}
+		err := scraper.UpdateTeamPostBallthai(db)
+		if err != nil {
+			log.Printf("[ERROR] UpdateTeamPostBallthai: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Write([]byte("Update team_post_ballthai completed!"))
+	}).Methods("GET")
+
+	// Scrape post proxy
+	router.HandleFunc("/scrape/post", scrapePostHandler).Methods("GET")
 	// Load configuration
 	cfg := config.LoadConfig()
 
 	// Initialize database
-	var err error
-	db, err := sql.Open("mysql", cfg.GetDSN())
+	db, err = sql.Open("mysql", cfg.GetDSN())
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}
@@ -41,9 +74,6 @@ func main() {
 	// Set database connection for handlers
 	handlers.SetDB(db)
 	database.SetDB(db)
-
-	// Create router
-	router := mux.NewRouter()
 
 	// Apply middleware
 	router.Use(middleware.Logging)
