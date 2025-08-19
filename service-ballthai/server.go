@@ -299,14 +299,6 @@ func main() {
 		})
 	}).Methods("GET")
 
-	// Start server
-	// โหลด environment variables
-	import (
-	    "os"
-	    "log"
-	    // ...existing import...
-	)
-
 	// อ่าน host/port จาก environment
 	host := os.Getenv("API_HOST")
 	if host == "" {
@@ -318,8 +310,5 @@ func main() {
 	}
 	addr := host + ":" + port
 	log.Printf("Starting server on %s", addr)
-	// ...existing code...
 	log.Fatal(http.ListenAndServe(addr, router))
-	
-	// Start server
 }
