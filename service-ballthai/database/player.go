@@ -11,8 +11,9 @@ import (
 // InsertOrUpdatePlayer inserts or updates a player record in the database
 func InsertOrUpdatePlayer(db *sql.DB, player models.PlayerDB) error {
 	var existingPlayerID int
-	query := "SELECT id FROM players WHERE player_ref_id = ?"
-	err := db.QueryRow(query, player.PlayerRefID).Scan(&existingPlayerID)
+	var existingStatus int
+	query := "SELECT id, status FROM players WHERE player_ref_id = ?"
+	err := db.QueryRow(query, player.PlayerRefID).Scan(&existingPlayerID, &existingStatus)
 
 	if err == sql.ErrNoRows {
 		// Insert new player
@@ -20,13 +21,13 @@ func InsertOrUpdatePlayer(db *sql.DB, player models.PlayerDB) error {
 			INSERT INTO players (
 				player_ref_id, league_id, team_id, nationality_id,
 				name, full_name_en, shirt_number, position, photo_url,
-				matches_played, goals, yellow_cards, red_cards
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				matches_played, goals, yellow_cards, red_cards, status
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`
 		_, err := db.Exec(insertQuery,
 			player.PlayerRefID, player.LeagueID, player.TeamID, player.NationalityID,
 			player.Name, player.FullNameEN, player.ShirtNumber, player.Position, player.PhotoURL,
-			player.MatchesPlayed, player.Goals, player.YellowCards, player.RedCards,
+			player.MatchesPlayed, player.Goals, player.YellowCards, player.RedCards, player.Status,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to insert player %s: %w", player.Name, err)
@@ -35,18 +36,23 @@ func InsertOrUpdatePlayer(db *sql.DB, player models.PlayerDB) error {
 	} else if err != nil {
 		return fmt.Errorf("failed to query existing player %d: %w", player.PlayerRefID, err)
 	} else {
+		// ถ้า status = 1 ไม่ให้อัปเดต
+		if existingStatus == 1 {
+			log.Printf("Skip update player: %s (ID: %d) because status=1", player.Name, existingPlayerID)
+			return nil
+		}
 		// Update existing player
 		updateQuery := `
 			UPDATE players SET
 				league_id = ?, team_id = ?, nationality_id = ?,
 				name = ?, full_name_en = ?, shirt_number = ?, position = ?, photo_url = ?,
-				matches_played = ?, goals = ?, yellow_cards = ?, red_cards = ?
+				matches_played = ?, goals = ?, yellow_cards = ?, red_cards = ?, status = ?
 			WHERE player_ref_id = ?
 		`
 		_, err := db.Exec(updateQuery,
 			player.LeagueID, player.TeamID, player.NationalityID,
 			player.Name, player.FullNameEN, player.ShirtNumber, player.Position, player.PhotoURL,
-			player.MatchesPlayed, player.Goals, player.YellowCards, player.RedCards,
+			player.MatchesPlayed, player.Goals, player.YellowCards, player.RedCards, player.Status,
 			player.PlayerRefID,
 		)
 		if err != nil {

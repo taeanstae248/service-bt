@@ -86,7 +86,7 @@ func ScrapePlayers(db *sql.DB, tournamentID int) error {
 		// เตรียมโครงสร้าง PlayerDB
 		playerDB := models.PlayerDB{
 			PlayerRefID:   sql.NullInt64{Int64: int64(apiPlayer.ID), Valid: true},
-			LeagueID:      sql.NullInt64{Int64: int64(leagueID), Valid: true}, // ใช้ leagueID ที่กำหนดตาม tournament
+			LeagueID:      sql.NullInt64{Int64: int64(leagueID), Valid: true},
 			TeamID:        playerTeamID,
 			NationalityID: nationalityID,
 			Name:          apiPlayer.FullName,
@@ -98,6 +98,7 @@ func ScrapePlayers(db *sql.DB, tournamentID int) error {
 			Goals:         apiPlayer.GoalFor,
 			YellowCards:   apiPlayer.YellowCardAcc,
 			RedCards:      apiPlayer.RedCardViolentConductAcc,
+			Status:        0, // default เปิดข้อมูล
 		}
 
 		// แทรกหรืออัปเดตผู้เล่นใน DB

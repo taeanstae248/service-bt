@@ -34,4 +34,5 @@ type PlayerDB struct {
 	Goals         int
 	YellowCards   int
 	RedCards      int
+	Status        int
 }
