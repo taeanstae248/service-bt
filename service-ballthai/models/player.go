@@ -10,7 +10,7 @@ type PlayerAPI struct {
 	GoalFor                int            `json:"goal_for"`
 	YellowCardAcc          int            `json:"yellow_card_acc"`
 	RedCardViolentConductAcc int          `json:"red_card_violent_conduct_acc"`
-	ShirtNumber            sql.NullInt64  `json:"tnm_shirt_number"` // Can be null in API
+	ShirtNumber            *int  `json:"shirt_number"` // รองรับ null และ int จาก JSON
 	Photo                  string         `json:"photo"`
 	ClubName               string         `json:"club_name"`
 	Nationality            NationalityAPI `json:"nationality"`

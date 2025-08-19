@@ -84,6 +84,12 @@ func ScrapePlayers(db *sql.DB, tournamentID int) error {
 		// เช่น if apiPlayer.ClubName == "นครศรี ยูไนเต็ด" { playerTeamID = sql.NullInt64{Int64: 923, Valid: true} }
 
 		// เตรียมโครงสร้าง PlayerDB
+		var shirtNumber sql.NullInt64
+		if apiPlayer.ShirtNumber != nil {
+			shirtNumber = sql.NullInt64{Int64: int64(*apiPlayer.ShirtNumber), Valid: true}
+		} else {
+			shirtNumber = sql.NullInt64{Valid: false}
+		}
 		playerDB := models.PlayerDB{
 			PlayerRefID:   sql.NullInt64{Int64: int64(apiPlayer.ID), Valid: true},
 			LeagueID:      sql.NullInt64{Int64: int64(leagueID), Valid: true},
@@ -91,7 +97,7 @@ func ScrapePlayers(db *sql.DB, tournamentID int) error {
 			NationalityID: nationalityID,
 			Name:          apiPlayer.FullName,
 			FullNameEN:    sql.NullString{String: apiPlayer.FullNameEN, Valid: apiPlayer.FullNameEN != ""},
-			ShirtNumber:   apiPlayer.ShirtNumber,
+			ShirtNumber:   shirtNumber,
 			Position:      sql.NullString{String: apiPlayer.PositionShortName, Valid: apiPlayer.PositionShortName != ""},
 			PhotoURL:      sql.NullString{String: photoPath, Valid: photoPath != ""},
 			MatchesPlayed: apiPlayer.MatchCount,
