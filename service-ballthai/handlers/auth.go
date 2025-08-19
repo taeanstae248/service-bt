@@ -101,6 +101,16 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	// Update last login
 	database.UpdateLastLogin(user.ID)
 
+	// Set session_id cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session_id",
+		Value:    sessionID,
+		Path:     "/",
+		HttpOnly: true,
+		// Secure: true, // เปิดถ้าใช้ HTTPS
+		Expires:  expiresAt,
+	})
+
 	// Return response
 	response := APIResponse{
 		Success: true,

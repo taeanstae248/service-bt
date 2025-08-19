@@ -119,7 +119,7 @@ func main() {
 	router.HandleFunc("/api/players/team/{team_id}", handlers.GetPlayersByTeamID).Methods("GET")
 	router.HandleFunc("/api/players/team-post/{team_post_id}", handlers.GetPlayersByTeamPost).Methods("GET")
 	router.HandleFunc("/api/players/{id:[0-9]+}", handlers.UpdatePlayer).Methods("PUT")
-	router.HandleFunc("/players.html", func(w http.ResponseWriter, r *http.Request) {
+	router.Handle("/players.html", middleware.CheckAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		db := database.DB
 		if db == nil {
 			http.Error(w, "Database not initialized", http.StatusInternalServerError)
@@ -187,52 +187,54 @@ func main() {
 		}
 		data := struct{ Players []Player }{Players: players}
 		tmpl.Execute(w, data)
-	})
+	})))
 
-	router.HandleFunc("/dashboard.html", func(w http.ResponseWriter, r *http.Request) {
+
+	// กลุ่ม route ที่ต้อง login
+	router.Handle("/dashboard.html", middleware.CheckAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tmpl, err := template.ParseFiles("templates/dashboard.html", "templates/_nav.html")
 		if err != nil {
 			http.Error(w, "Template error", 500)
 			return
 		}
 		tmpl.Execute(w, nil)
-	})
+	})))
 
-	router.HandleFunc("/teams.html", func(w http.ResponseWriter, r *http.Request) {
+	router.Handle("/teams.html", middleware.CheckAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tmpl, err := template.ParseFiles("templates/teams.html", "templates/_nav.html")
 		if err != nil {
 			http.Error(w, "Template error", 500)
 			return
 		}
 		tmpl.Execute(w, nil)
-	})
+	})))
 
-	router.HandleFunc("/leagues.html", func(w http.ResponseWriter, r *http.Request) {
+	router.Handle("/leagues.html", middleware.CheckAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tmpl, err := template.ParseFiles("templates/leagues.html", "templates/_nav.html")
 		if err != nil {
 			http.Error(w, "Template error", 500)
 			return
 		}
 		tmpl.Execute(w, nil)
-	})
+	})))
 
-	router.HandleFunc("/matches.html", func(w http.ResponseWriter, r *http.Request) {
+	router.Handle("/matches.html", middleware.CheckAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tmpl, err := template.ParseFiles("templates/matches.html", "templates/_nav.html")
 		if err != nil {
 			http.Error(w, "Template error", 500)
 			return
 		}
 		tmpl.Execute(w, nil)
-	})
+	})))
 
-	router.HandleFunc("/standings.html", func(w http.ResponseWriter, r *http.Request) {
+	router.Handle("/standings.html", middleware.CheckAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tmpl, err := template.ParseFiles("templates/standings.html", "templates/_nav.html")
 		if err != nil {
 			http.Error(w, "Template error", 500)
 			return
 		}
 		tmpl.Execute(w, nil)
-	})
+	})))
 
 
 
