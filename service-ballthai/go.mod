@@ -1,8 +1,7 @@
+
 module go-ballthai-scraper
 
 go 1.23
-
-toolchain go1.24.5
 
 require (
 	github.com/go-sql-driver/mysql v1.8.1 // ตรวจสอบเวอร์ชันล่าสุดที่ https://pkg.go.dev/github.com/go-sql-driver/mysql
