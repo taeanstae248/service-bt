@@ -302,13 +302,22 @@ func main() {
 	// อ่าน host/port จาก environment
 	host := os.Getenv("API_HOST")
 	if host == "" {
-	    host = "0.0.0.0"
+		host = "0.0.0.0"
 	}
 	port := os.Getenv("API_PORT")
 	if port == "" {
-	    port = "8080"
+		port = "8080"
 	}
 	addr := host + ":" + port
-	log.Printf("Starting server on %s", addr)
-	log.Fatal(http.ListenAndServe(addr, router))
+
+	if port == "443" {
+		log.Printf("Starting HTTPS server on %s", addr)
+		err := http.ListenAndServeTLS(addr, "/etc/letsencrypt/live/svc.ballthai.com/fullchain.pem", "/etc/letsencrypt/live/svc.ballthai.com/privkey.pem", router)
+		if err != nil {
+			log.Fatal("ListenAndServeTLS error:", err)
+		}
+	} else {
+		log.Printf("Starting HTTP server on %s", addr)
+		log.Fatal(http.ListenAndServe(addr, router))
+	}
 }
