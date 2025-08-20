@@ -64,8 +64,8 @@ type Match struct {
 	TeamPostAway  *string `json:"team_post_away,omitempty"`
 	ChannelID     *int    `json:"channel_id,omitempty"`
 	LiveChannelID *int    `json:"live_channel_id,omitempty"`
-	HomeLogo      *string `json:"home_logo,omitempty"`
-	AwayLogo      *string `json:"away_logo,omitempty"`
+		HomeLogo      *string `json:"logo_home,omitempty"`
+		AwayLogo      *string `json:"logo_away,omitempty"`
 }
 
 type Player struct {
