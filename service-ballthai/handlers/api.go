@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
+	"go-ballthai-scraper/database"
 )
 
 // Data structures
@@ -61,8 +62,10 @@ type Match struct {
 	LeagueName    *string `json:"league_name,omitempty"`
 	TeamPostHome  *string `json:"team_post_home,omitempty"`
 	TeamPostAway  *string `json:"team_post_away,omitempty"`
-	ChannelID     *int    `json:"channel_id,omitempty"`      // เพิ่ม field นี้
-	LiveChannelID *int    `json:"live_channel_id,omitempty"` // เพิ่ม field นี้
+	ChannelID     *int    `json:"channel_id,omitempty"`
+	LiveChannelID *int    `json:"live_channel_id,omitempty"`
+	HomeLogo      *string `json:"home_logo,omitempty"`
+	AwayLogo      *string `json:"away_logo,omitempty"`
 }
 
 type Player struct {
@@ -572,6 +575,17 @@ func GetMatches(w http.ResponseWriter, r *http.Request) {
 		}
 		// เพิ่มเติม: ให้ match.MatchStatus = match.Status เพื่อให้ JS ใช้ได้
 		match.MatchStatus = match.Status
+
+		// ดึงโลโก้ทีมเหย้า/เยือน
+		homeLogo, err1 := database.GetTeamLogoByName(DB, match.HomeTeam)
+		awayLogo, err2 := database.GetTeamLogoByName(DB, match.AwayTeam)
+		if err1 == nil && homeLogo != "" {
+			match.HomeLogo = &homeLogo
+		}
+		if err2 == nil && awayLogo != "" {
+			match.AwayLogo = &awayLogo
+		}
+
 		matches = append(matches, match)
 	}
 
