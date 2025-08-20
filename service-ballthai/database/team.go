@@ -3,11 +3,8 @@ package database
 import (
 	"database/sql"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
 	"os"
-	"path"
 	"strings"
 
 	"go-ballthai-scraper/models" // ตรวจสอบให้แน่ใจว่าชื่อโมดูลตรงกับ go.mod ของคุณ
@@ -61,72 +58,45 @@ func InsertOrUpdateTeam(db *sql.DB, team models.TeamDB) error {
 	query := "SELECT id FROM teams WHERE name_th = ?"
 	err := db.QueryRow(query, team.NameTH).Scan(&existingTeamID)
 
-	// เตรียมตัวแปรโลโก้ให้พร้อมใช้
-	logoFileName := ""
-	logoDBPath := ""
-	if team.LogoURL.Valid && team.LogoURL.String != "" {
-		resp, err := http.Get(team.LogoURL.String)
-		if err == nil {
-			defer resp.Body.Close()
-			if resp.StatusCode == 200 {
-				ext := path.Ext(team.LogoURL.String)
-				baseName := team.NameEN.String
-				if baseName == "" {
-					baseName = team.NameTH
-				}
-				if baseName == "" {
-					baseName = "team"
-				}
-				logoFileName = fmt.Sprintf("%s%s", baseName, ext)
-				logoFileName = sanitizeFileName(logoFileName)
-				f, err := os.Create(path.Join("img/teams", logoFileName))
-				if err == nil {
-					io.Copy(f, resp.Body)
-					f.Close()
-				}
-			}
-		}
-	}
-	if logoFileName != "" {
-		logoDBPath = "/img/teams/" + logoFileName
-	}
+		// รับ path local จาก team.LogoURL โดยตรง ไม่ดาวน์โหลดซ้ำ
+		logoDBPath := team.LogoURL.String
 
-	if err == sql.ErrNoRows {
-		// Insert new team
-		insertQuery := `
-			INSERT INTO teams (
-				name_th, name_en, logo_url,
-				team_post_ballthai, website, shop, stadium_id
-			) VALUES (?, ?, ?, ?, ?, ?, ?)
-		`
-		_, err := db.Exec(insertQuery,
-			team.NameTH, team.NameEN, sql.NullString{String: logoDBPath, Valid: logoDBPath != ""},
-			team.TeamPostBallthai, team.Website, team.Shop, team.StadiumID,
-		)
-		if err != nil {
-			return fmt.Errorf("failed to insert team %s: %w", team.NameTH, err)
-		}
-		log.Printf("Inserted new team: %s", team.NameTH)
-	} else if err != nil {
-		return fmt.Errorf("failed to query existing team %s: %w", team.NameTH, err)
-	} else {
-		// Update existing team
-		updateQuery := `
-			UPDATE teams SET
-				name_en = ?, logo_url = ?,
-				team_post_ballthai = ?, website = ?, shop = ?, stadium_id = ?
-			WHERE id = ?
-		`
-		_, err := db.Exec(updateQuery,
-			team.NameEN, sql.NullString{String: logoDBPath, Valid: logoDBPath != ""},
-			team.TeamPostBallthai, team.Website, team.Shop, team.StadiumID,
-			existingTeamID,
-		)
-		if err != nil {
-			return fmt.Errorf("failed to update team %s: %w", team.NameTH, err)
-		}
-		log.Printf("Updated existing team: %s (ID: %d)", team.NameTH, existingTeamID)
-	}
+	   if err == sql.ErrNoRows {
+		   // Insert new team
+		   insertQuery := `
+			   INSERT INTO teams (
+				   name_th, name_en, logo_url,
+				   team_post_ballthai, website, shop, stadium_id
+			   ) VALUES (?, ?, ?, ?, ?, ?, ?)
+		   `
+		   _, err := db.Exec(insertQuery,
+			   team.NameTH, team.NameEN, sql.NullString{String: logoDBPath, Valid: logoDBPath != ""},
+			   team.TeamPostBallthai, team.Website, team.Shop, team.StadiumID,
+		   )
+		   if err != nil {
+			   return fmt.Errorf("failed to insert team %s: %w", team.NameTH, err)
+		   }
+		   log.Printf("Inserted new team: %s", team.NameTH)
+	   } else if err != nil {
+		   return fmt.Errorf("failed to query existing team %s: %w", team.NameTH, err)
+	   } else {
+		   // Update existing team
+		   updateQuery := `
+			   UPDATE teams SET
+				   name_en = ?, logo_url = ?,
+				   team_post_ballthai = ?, website = ?, shop = ?, stadium_id = ?
+			   WHERE id = ?
+		   `
+		   _, err := db.Exec(updateQuery,
+			   team.NameEN, sql.NullString{String: logoDBPath, Valid: logoDBPath != ""},
+			   team.TeamPostBallthai, team.Website, team.Shop, team.StadiumID,
+			   existingTeamID,
+		   )
+		   if err != nil {
+			   return fmt.Errorf("failed to update team %s: %w", team.NameTH, err)
+		   }
+		   log.Printf("Updated existing team: %s (ID: %d)", team.NameTH, existingTeamID)
+	   }
 	return nil
 }
 

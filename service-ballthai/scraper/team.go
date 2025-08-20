@@ -17,31 +17,45 @@ import (
 )
 
 // SaveTeamsAndLogosByLeagueID ดึงทีมจาก API, บันทึกลง DB, ดาวน์โหลดโลโก้
-func SaveTeamsAndLogosByLeagueID(db *sql.DB, leagueID string) error {
+func SaveTeamsAndLogosByLeagueID(db *sql.DB, leagueID string) (int, error) {
    teams, err := FetchTeamsByLeagueID(leagueID)
    if err != nil {
-	   return err
+	   return 0, err
    }
+   imported := 0
    for _, team := range teams {
-	   // 1. Save to DB (insert or update)
+	   var logoPath string
+	   baseName := team.NameEN
+	   if baseName == "" {
+		   baseName = slugify(team.Name)
+	   }
+	   if team.Logo != "" {
+		   ext := path.Ext(team.Logo)
+		   if ext == "" {
+			   ext = ".png"
+		   }
+		   fileName := sanitizeFileName(baseName) + ext
+		   logoPath = path.Join("/img/teams", fileName)
+		   if err := downloadLogoToFolder(team.Logo, baseName); err != nil {
+			   log.Printf("Download logo failed for %s: %v", baseName, err)
+			   logoPath = "" // ถ้าดาวน์โหลดไม่สำเร็จ
+		   }
+	   }
 	   teamDB := models.TeamDB{
 		   NameTH:   team.Name,
 		   NameEN:   sql.NullString{String: team.NameEN, Valid: team.NameEN != ""},
-		   LogoURL:  sql.NullString{String: team.Logo, Valid: team.Logo != ""},
+		   LogoURL:  sql.NullString{String: logoPath, Valid: logoPath != ""},
 		   Website:  sql.NullString{String: team.Website, Valid: team.Website != ""},
 		   Shop:     sql.NullString{String: team.Shop, Valid: team.Shop != ""},
 	   }
-	   _ = database.InsertOrUpdateTeam(db, teamDB) // ignore error for now
-
-	   // 2. Download logo
-	   if team.Logo != "" {
-		   if err := downloadLogoToFolder(team.Logo, team.Name); err != nil {
-			   log.Printf("Download logo failed for %s: %v", team.Name, err)
-		   }
+	   if err := database.InsertOrUpdateTeam(db, teamDB); err == nil {
+		   imported++
 	   }
    }
-   return nil
+   return imported, nil
 }
+
+// slugify แปลงชื่อไทยเป็น slug ภาษาอังกฤษ (a-z, 0-9, -)
 
 // downloadLogoToFolder ดาวน์โหลดโลโก้แล้วบันทึกลง img/teams/
 func downloadLogoToFolder(logoURL, teamName string) error {
@@ -70,6 +84,25 @@ func downloadLogoToFolder(logoURL, teamName string) error {
    _, err = io.Copy(out, resp.Body)
    return err
 }
+
+// slugify แปลงชื่อไทยเป็น slug ภาษาอังกฤษ (a-z, 0-9, -)
+func slugify(s string) string {
+   s = strings.ToLower(s)
+   // แทนที่อักขระที่ไม่ใช่ a-z, 0-9 ด้วย -
+   var b strings.Builder
+   for _, r := range s {
+	   if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+		   b.WriteRune(r)
+	   } else {
+		   b.WriteRune('-')
+	   }
+   }
+   // ลบ - ซ้ำกันและขอบ
+   slug := b.String()
+		slug = strings.ReplaceAll(slug, "--", "-")
+		slug = strings.Trim(slug, "-")
+		return slug
+	}
 
 // sanitizeFileName แปลงชื่อทีมให้เป็นชื่อไฟล์ที่ปลอดภัย
 func sanitizeFileName(name string) string {

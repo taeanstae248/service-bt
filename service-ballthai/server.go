@@ -19,7 +19,6 @@ import (
 	"go-ballthai-scraper/handlers"
 	"go-ballthai-scraper/middleware"
 	"go-ballthai-scraper/scraper"
-	"go-ballthai-scraper/models"
 )
 
 
@@ -278,43 +277,22 @@ func main() {
 	router.HandleFunc("/scrape/teams/{leagueid}", func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		leagueID := vars["leagueid"]
-		teams, err := scraper.FetchTeamsByLeagueID(leagueID)
-		if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
-		// ดึง db จาก database.DB
 		db := database.DB
 		if db == nil {
 			http.Error(w, "Database not initialized", 500)
 			return
 		}
-		imported := 0
-		errors := []string{}
-		for _, t := range teams {
-			teamDB := models.TeamDB{
-				TeamRefID:        sql.NullInt64{Int64: int64(t.ID), Valid: true},
-				NameTH:           t.Name,
-				NameEN:           sql.NullString{String: t.NameEN, Valid: t.NameEN != ""},
-				LogoURL:          sql.NullString{String: t.Logo, Valid: t.Logo != ""},
-				Website:          sql.NullString{String: t.Website, Valid: t.Website != ""},
-				Shop:             sql.NullString{String: t.Shop, Valid: t.Shop != ""},
-				StadiumID:        sql.NullInt64{Valid: false}, // ต้อง mapping stadium เพิ่มถ้าต้องการ
-				LeagueID:         sql.NullInt64{Valid: false}, // สามารถใส่ league id ที่ map กับ thaileageid ได้
-			}
-			err := database.InsertOrUpdateTeam(db, teamDB)
-			if err != nil {
-				errors = append(errors, t.Name+": "+err.Error())
-				continue
-			}
-			imported++
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": true,
-			"imported": imported,
-			"errors": errors,
-		})
+		   imported, err := scraper.SaveTeamsAndLogosByLeagueID(db, leagueID)
+		   if err != nil {
+			   http.Error(w, err.Error(), 500)
+			   return
+		   }
+		   w.Header().Set("Content-Type", "application/json")
+		   json.NewEncoder(w).Encode(map[string]interface{}{
+			   "success": true,
+			   "imported": imported,
+			   "message": "นำเข้าทีมและโลโก้สำเร็จ (logo_url เป็น path local เท่านั้น)",
+		   })
 	}).Methods("GET")
 
 	// อ่าน host/port จาก environment
