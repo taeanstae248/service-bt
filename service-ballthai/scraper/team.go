@@ -1,15 +1,86 @@
+
 package scraper
 
 import (
-	"database/sql"
-	"encoding/json"
-	"fmt"
-	"io"
-	"log"
-	"net/http"
+   "database/sql"
+   "encoding/json"
+   "fmt"
+   "io"
+   "log"
+   "net/http"
+   "os"
+   "path"
+   "strings"
 
-	"go-ballthai-scraper/models"
+   "go-ballthai-scraper/models"
+   "go-ballthai-scraper/database"
 )
+
+// SaveTeamsAndLogosByLeagueID ดึงทีมจาก API, บันทึกลง DB, ดาวน์โหลดโลโก้
+func SaveTeamsAndLogosByLeagueID(db *sql.DB, leagueID string) error {
+   teams, err := FetchTeamsByLeagueID(leagueID)
+   if err != nil {
+	   return err
+   }
+   for _, team := range teams {
+	   // 1. Save to DB (insert or update)
+	   teamDB := models.TeamDB{
+		   NameTH:   team.Name,
+		   NameEN:   sql.NullString{String: team.NameEN, Valid: team.NameEN != ""},
+		   LogoURL:  sql.NullString{String: team.Logo, Valid: team.Logo != ""},
+		   Website:  sql.NullString{String: team.Website, Valid: team.Website != ""},
+		   Shop:     sql.NullString{String: team.Shop, Valid: team.Shop != ""},
+	   }
+	   _ = database.InsertOrUpdateTeam(db, teamDB) // ignore error for now
+
+	   // 2. Download logo
+	   if team.Logo != "" {
+		   if err := downloadLogoToFolder(team.Logo, team.Name); err != nil {
+			   log.Printf("Download logo failed for %s: %v", team.Name, err)
+		   }
+	   }
+   }
+   return nil
+}
+
+// downloadLogoToFolder ดาวน์โหลดโลโก้แล้วบันทึกลง img/teams/
+func downloadLogoToFolder(logoURL, teamName string) error {
+   resp, err := http.Get(logoURL)
+   if err != nil {
+	   return err
+   }
+   defer resp.Body.Close()
+   if resp.StatusCode != http.StatusOK {
+	   return fmt.Errorf("logo url returned status %d", resp.StatusCode)
+   }
+   ext := path.Ext(logoURL)
+   if ext == "" {
+	   ext = ".png"
+   }
+   fileName := sanitizeFileName(teamName) + ext
+   outPath := path.Join("img/teams", fileName)
+   if err := os.MkdirAll("img/teams", 0755); err != nil {
+	   return err
+   }
+   out, err := os.Create(outPath)
+   if err != nil {
+	   return err
+   }
+   defer out.Close()
+   _, err = io.Copy(out, resp.Body)
+   return err
+}
+
+// sanitizeFileName แปลงชื่อทีมให้เป็นชื่อไฟล์ที่ปลอดภัย
+func sanitizeFileName(name string) string {
+   invalid := []string{"/", "\\", ":", "*", "?", "\"", "<", ">", "|", " "}
+   for _, c := range invalid {
+	   name = strings.ReplaceAll(name, c, "_")
+   }
+   return name
+}
+
+
 
 const idPostAPIURL = "https://serviceseoball.com/api/id_post.php"
 
