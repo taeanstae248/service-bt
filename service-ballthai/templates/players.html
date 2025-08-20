@@ -12,6 +12,7 @@
     <div class="container mt-4">
         <h2>จัดการผู้เล่น</h2>
         <div style="margin-bottom:1rem; display:flex; gap:1rem; align-items:center; flex-wrap:wrap;">
+            <button id="scrapePlayerBtn" class="btn btn-primary" onclick="scrapePlayers()">🔄 ดึงข้อมูลผู้เล่น</button>
             <label>ค้นหาชื่อ:
                 <input type="text" id="playerNameInput" class="form-control" style="width:180px;" placeholder="ชื่อผู้เล่น">
             </label>
@@ -111,6 +112,26 @@
         </table>
     </div>
     <script>
+        function scrapePlayers() {
+            if (!confirm('ต้องการดึงข้อมูลผู้เล่นจากแหล่งข้อมูลภายนอกใช่หรือไม่?')) return;
+            const btn = document.getElementById('scrapePlayerBtn');
+            btn.disabled = true;
+            btn.textContent = 'กำลังดึง...';
+            const baseUrl = window.location.origin;
+            fetch(baseUrl + '/scraper/player')
+                .then(res => res.text())
+                .then(text => {
+                    alert('ผลลัพธ์: ' + text);
+                    window.location.reload();
+                })
+                .catch(err => {
+                    alert('ดึงข้อมูลไม่สำเร็จ: ' + err.message);
+                })
+                .finally(() => {
+                    btn.disabled = false;
+                    btn.textContent = '🔄 ดึงข้อมูลผู้เล่น';
+                });
+        }
         // โหลดลีกและทีม
         let allLeagues = [];
         let allTeams = [];

@@ -9,45 +9,29 @@ import (
 	"go-ballthai-scraper/models"   // ตรวจสอบให้แน่ใจว่าชื่อโมดูลตรงกับ go.mod ของคุณ
 )
 
-// ScrapePlayers ดึงข้อมูลผู้เล่นจาก API และบันทึกลงฐานข้อมูล
-// ฟังก์ชันนี้รวมตรรกะจากฟังก์ชัน PHP Scrape_R*_Player และ Player_Public
-func ScrapePlayers(db *sql.DB, tournamentID int) error {
-
-	// แปลง leagueID (1,2) เป็น tournamentID (207,208) ก่อนเรียก API
-	var apiTournamentID int
-	switch tournamentID {
-	case 1:
-		apiTournamentID = 207 // Thai League 1
-	case 2:
-		apiTournamentID = 208 // Thai League 2
-	default:
-		apiTournamentID = 207 // Default to Thai League 1
-	}
-	apiURL := fmt.Sprintf("https://competition.tl.prod.c0d1um.io/thaileague/api/player-public/all_players_search/?page=1&tournament=%d", apiTournamentID)
-
-	log.Printf("Scraping players from: %s (leagueID=%d, tournamentID=%d)", apiURL, tournamentID, apiTournamentID)
-
-	var apiResponse struct {
-		Results []models.PlayerAPI `json:"results"`
-	}
-	err := FetchAndParseAPI(apiURL, &apiResponse)
+// ScrapePlayers ดึงข้อมูลผู้เล่นจาก API ทุกลีกใน DB และบันทึกลงฐานข้อมูล
+func ScrapePlayers(db *sql.DB) error {
+	leagues, err := database.GetAllLeagues(db)
 	if err != nil {
-		log.Printf("Error fetching players from %s: %v", apiURL, err)
 		return err
 	}
+	for _, league := range leagues {
+		if league.ThaileageID == 0 {
+			continue
+		}
+		apiURL := fmt.Sprintf("https://competition.tl.prod.c0d1um.io/thaileague/api/player-public/all_players_search/?page=1&tournament=%d", league.ThaileageID)
+		log.Printf("Scraping players from: %s (leagueID=%d, thaileageid=%d)", apiURL, league.ID, league.ThaileageID)
 
-	// กำหนด League ID ตาม Tournament ID
-	var leagueID int
-	switch tournamentID {
-	case 207:
-		leagueID = 1 // Thai League 1
-	case 208:
-		leagueID = 2 // Thai League 2
-	default:
-		leagueID = 2 // Default to Thai League 2
-	}
+		var apiResponse struct {
+			Results []models.PlayerAPI `json:"results"`
+		}
+		err := FetchAndParseAPI(apiURL, &apiResponse)
+		if err != nil {
+			log.Printf("Error fetching players from %s: %v", apiURL, err)
+			continue
+		}
 
-	for _, apiPlayer := range apiResponse.Results {
+		for _, apiPlayer := range apiResponse.Results {
 		// ดาวน์โหลดรูปภาพผู้เล่น
 		photoPath := ""
 		if apiPlayer.Photo != "" {
@@ -90,22 +74,22 @@ func ScrapePlayers(db *sql.DB, tournamentID int) error {
 		} else {
 			shirtNumber = sql.NullInt64{Valid: false}
 		}
-		playerDB := models.PlayerDB{
-			PlayerRefID:   sql.NullInt64{Int64: int64(apiPlayer.ID), Valid: true},
-			LeagueID:      sql.NullInt64{Int64: int64(leagueID), Valid: true},
-			TeamID:        playerTeamID,
-			NationalityID: nationalityID,
-			Name:          apiPlayer.FullName,
-			FullNameEN:    sql.NullString{String: apiPlayer.FullNameEN, Valid: apiPlayer.FullNameEN != ""},
-			ShirtNumber:   shirtNumber,
-			Position:      sql.NullString{String: apiPlayer.PositionShortName, Valid: apiPlayer.PositionShortName != ""},
-			PhotoURL:      sql.NullString{String: photoPath, Valid: photoPath != ""},
-			MatchesPlayed: apiPlayer.MatchCount,
-			Goals:         apiPlayer.GoalFor,
-			YellowCards:   apiPlayer.YellowCardAcc,
-			RedCards:      apiPlayer.RedCardViolentConductAcc,
-			Status:        0, // default เปิดข้อมูล
-		}
+			playerDB := models.PlayerDB{
+				PlayerRefID:   sql.NullInt64{Int64: int64(apiPlayer.ID), Valid: true},
+				LeagueID:      sql.NullInt64{Int64: int64(league.ID), Valid: true},
+				TeamID:        playerTeamID,
+				NationalityID: nationalityID,
+				Name:          apiPlayer.FullName,
+				FullNameEN:    sql.NullString{String: apiPlayer.FullNameEN, Valid: apiPlayer.FullNameEN != ""},
+				ShirtNumber:   shirtNumber,
+				Position:      sql.NullString{String: apiPlayer.PositionShortName, Valid: apiPlayer.PositionShortName != ""},
+				PhotoURL:      sql.NullString{String: photoPath, Valid: photoPath != ""},
+				MatchesPlayed: apiPlayer.MatchCount,
+				Goals:         apiPlayer.GoalFor,
+				YellowCards:   apiPlayer.YellowCardAcc,
+				RedCards:      apiPlayer.RedCardViolentConductAcc,
+				Status:        0, // default เปิดข้อมูล
+			}
 
 		// แทรกหรืออัปเดตผู้เล่นใน DB
 		err = database.InsertOrUpdatePlayer(db, playerDB)
@@ -114,5 +98,7 @@ func ScrapePlayers(db *sql.DB, tournamentID int) error {
 		}
 	}
 
+		}
+	}
 	return nil
 }
