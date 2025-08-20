@@ -16,8 +16,10 @@
         <div class="teams-header">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <h1 class="teams-title">จัดการแมทช์</h1>
-                <button id="addMatchBtn" class="btn-primary" style="margin-left: auto;" onclick="addMatch()">➕
-                    เพิ่มแมทช์ใหม่</button>
+                <div style="display: flex; gap: 10px; margin-left: auto;">
+                    <button id="addMatchBtn" class="btn-primary" onclick="addMatch()">➕ เพิ่มแมทช์ใหม่</button>
+                    <button id="scrapeMatchesBtn" class="btn-primary" onclick="scrapeMatches()">🔄 ดึงข้อมูลแมทช์</button>
+                </div>
             </div>
         </div>
         <div class="search-container">
@@ -124,6 +126,25 @@
         </div>
     </div>
     <script src="/static/js/matches.js"></script>
+
+    <script>
+    function scrapeMatches() {
+        if (!confirm('ต้องการดึงข้อมูลแมทช์จากแหล่งข้อมูลภายนอกใช่หรือไม่?')) return;
+        document.getElementById('loadingSpinner').style.display = 'block';
+        fetch('http://localhost:8080/scraper/matches')
+            .then(res => res.text())
+            .then(text => {
+                alert('ผลลัพธ์: ' + text);
+                if (typeof fetchMatches === 'function') fetchMatches();
+            })
+            .catch(err => {
+                alert('ดึงข้อมูลไม่สำเร็จ: ' + err.message);
+            })
+            .finally(() => {
+                document.getElementById('loadingSpinner').style.display = 'none';
+            });
+    }
+    </script>
 
 </body>
 
