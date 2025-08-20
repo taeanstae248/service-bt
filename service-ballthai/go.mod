@@ -19,6 +19,7 @@ require (
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/andybalholm/cascadia v1.3.3 // indirect
+	github.com/robfig/cron/v3 v3.0.1 // indirect
 	golang.org/x/net v0.41.0 // indirect
 )
 

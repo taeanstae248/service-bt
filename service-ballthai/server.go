@@ -1,5 +1,6 @@
+
 package main
-// scrapePostHandler ดึงข้อมูลจาก serviceseoball.com แล้วส่งต่อให้ client
+
 import (
 	"database/sql"
 	"encoding/json"
@@ -8,6 +9,7 @@ import (
 	"html/template"
 	"strings"
 	"os"
+	"github.com/robfig/cron/v3"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/mux"
@@ -20,6 +22,7 @@ import (
 	"go-ballthai-scraper/models"
 )
 
+
 	// scrapePostHandler ดึงข้อมูลจาก serviceseoball.com แล้วส่งต่อให้ client
 	func scrapePostHandler(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
@@ -27,6 +30,19 @@ import (
 	}
 
 func main() {
+   // --- Cronjob: ดึง /scraper/matches ทุก 30 นาที ---
+   c := cron.New()
+   // ดึงทุกชั่วโมง เฉพาะ 7, 15, 16, 17, 18, 19, 20, 21 น.
+   c.AddFunc("0 7,15-21 * * *", func() {
+	   resp, err := http.Get("http://localhost:8080/scraper/matches")
+	   if err != nil {
+		   log.Println("cron fetch error /scraper/matches:", err)
+		   return
+	   }
+	   defer resp.Body.Close()
+	   log.Println("cron fetch /scraper/matches status:", resp.Status)
+   })
+   c.Start()
 	// ประกาศตัวแปร db และ err
 	var db *sql.DB
 	var err error

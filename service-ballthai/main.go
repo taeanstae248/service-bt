@@ -1,13 +1,13 @@
 // ...existing code...
 package main
 
-import (
 	"database/sql"
 	"go-ballthai-scraper/handlers"
 	"go-ballthai-scraper/scraper"
 	"log"
 	"net/http"
 	"os"
+	"github.com/robfig/cron/v3"
 
 	_ "github.com/go-sql-driver/mysql" // Driver สำหรับ MySQL
 	"github.com/gorilla/mux"
@@ -17,6 +17,18 @@ import (
 var db *sql.DB // ตัวแปร Global สำหรับเก็บ Connection ฐานข้อมูล
 
 func main() {
+   // --- Cronjob: ดึง /scraper/matches ทุก 30 นาที ---
+   c := cron.New()
+   c.AddFunc("0,30 * * * *", func() {
+	   resp, err := http.Get("http://localhost:8080/scraper/matches")
+	   if err != nil {
+		   log.Println("cron fetch error /scraper/matches:", err)
+		   return
+	   }
+	   defer resp.Body.Close()
+	   log.Println("cron fetch /scraper/matches status:", resp.Status)
+   })
+   c.Start()
 // ...existing code...
        // ...existing code...
 // ...existing code...
