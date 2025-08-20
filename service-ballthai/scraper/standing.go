@@ -14,58 +14,49 @@ import (
 
 // ScrapeStandings ดึงข้อมูลตารางคะแนนลีกจาก API และบันทึกลงฐานข้อมูล
 func ScrapeStandings(db *sql.DB) error {
-	// แมปค่า $_GET['table'] ของ PHP กับ URL API และ DB league ID
-	standingConfigs := map[string]struct {
-		URL      string
-		LeagueID int // สอดคล้องกับ League ID ใน DB ของคุณ
-		IsT3     bool
-	}{
-		"t1":      {URL: "https://competition.tl.prod.c0d1um.io/thaileague/api/stage-standing-public/?tournament=207", LeagueID: 1},             // ตัวอย่าง: แมปกับ DB league ID 1
-		"t2":      {URL: "https://competition.tl.prod.c0d1um.io/thaileague/api/stage-standing-public/?tournament=196", LeagueID: 2},             // ตัวอย่าง: แมปกับ DB league ID 2
-		"t3":      {URL: "https://competition.tl.prod.c0d1um.io/thaileague/api/stage-standing-public/?tournament=197", LeagueID: 3, IsT3: true}, // ตัวอย่าง: แมปกับ DB league ID 3, การจัดการพิเศษสำหรับ T3
-		"samipro": {URL: "https://competition.tl.prod.c0d1um.io/thaileague/api/stage-standing-public/dashboard/?tournament=206", LeagueID: 59},  // ตัวอย่าง: แมปกับ DB league ID 59
-		"revo":    {URL: "https://competition.tl.prod.c0d1um.io/thaileague/api/stage-standing-public/?tournament=155", LeagueID: 4},             // ตัวอย่าง: แมปกับ DB league ID 4
-		// เพิ่มการกำหนดค่าเพิ่มเติมตามความจำเป็น
-	}
+	   leagues, err := database.GetAllLeagues(db)
+	   if err != nil {
+		   return err
+	   }
+	   for _, league := range leagues {
+		   if league.ThaileageID == 0 {
+			   continue
+		   }
+		   url := fmt.Sprintf("https://competition.tl.prod.c0d1um.io/thaileague/api/stage-standing-public/?tournament=%d", league.ThaileageID)
+		   log.Printf("Scraping standings for %s (%s)", league.Name, url)
 
-	for configName, config := range standingConfigs {
-		log.Printf("Scraping standings for %s (%s)", configName, config.URL)
+		   var apiResponse []models.StandingAPI
+		   err := FetchAndParseAPI(url, &apiResponse)
+		   if err != nil {
+			   log.Printf("Error fetching standings for %s: %v", league.Name, err)
+			   continue
+		   }
 
-		var apiResponse []models.StandingAPI // API สำหรับตารางคะแนนคืนค่าเป็น array โดยตรง
-		err := FetchAndParseAPI(config.URL, &apiResponse)
-		if err != nil {
-			log.Printf("Error fetching standings for %s: %v", configName, err)
-			continue
-		}
+		   for _, apiStanding := range apiResponse {
+			   // รับ Team ID
+			   teamID := 0
+			   if apiStanding.TournamentTeamName != "" {
+				   tID, err := database.GetTeamIDByThaiName(db, apiStanding.TournamentTeamName, apiStanding.TournamentTeamLogo)
+				   if err != nil {
+					   log.Printf("Warning: Failed to get team ID for standing team %s: %v", apiStanding.TournamentTeamName, err)
+					   continue
+				   }
+				   teamID = tID
+			   } else {
+				   log.Printf("Warning: Standing entry for %s has no team name, skipping.", league.Name)
+				   continue
+			   }
 
-		// เดิม: filter เฉพาะ SOUTH สำหรับ T3
-		// ใหม่: ไม่ filter ใดๆ เพื่อเก็บ standings ทุกโซนของ T3
-
-		for _, apiStanding := range apiResponse {
-			// รับ Team ID
-			teamID := 0
-			if apiStanding.TournamentTeamName != "" {
-				tID, err := database.GetTeamIDByThaiName(db, apiStanding.TournamentTeamName, apiStanding.TournamentTeamLogo)
-				if err != nil {
-					log.Printf("Warning: Failed to get team ID for standing team %s: %v", apiStanding.TournamentTeamName, err)
-					continue // ข้ามหากไม่สามารถแก้ไข Team ID ได้
-				}
-				teamID = tID
-			} else {
-				log.Printf("Warning: Standing entry for %s has no team name, skipping.", configName)
-				continue
-			}
-
-			// หา stage_id จาก stage_name (ถ้าไม่มีจะ insert ให้)
-			stageID := sql.NullInt64{Valid: false}
-			if apiStanding.StageName != "" {
-				id, err := database.GetStageID(db, apiStanding.StageName, config.LeagueID)
-				if err == nil {
-					stageID = sql.NullInt64{Int64: int64(id), Valid: true}
-				}
-			}
+			   // หา stage_id จาก stage_name (ถ้าไม่มีจะ insert ให้)
+			   stageID := sql.NullInt64{Valid: false}
+			   if apiStanding.StageName != "" {
+				   id, err := database.GetStageID(db, apiStanding.StageName, league.ID)
+				   if err == nil {
+					   stageID = sql.NullInt64{Int64: int64(id), Valid: true}
+				   }
+			   }
 			   standingDB := models.StandingDB{
-				   LeagueID:       config.LeagueID,
+				   LeagueID:       league.ID,
 				   TeamID:         teamID,
 				   MatchesPlayed:  apiStanding.MatchPlay,
 				   Wins:           apiStanding.Win,
@@ -81,7 +72,7 @@ func ScrapeStandings(db *sql.DB) error {
 			   }
 
 			   // เช็ค status ก่อนอัปเดต: ถ้า status=0 (OFF) ข้าม ไม่อัปเดต/insert
-			   status, err := database.GetStandingStatus(db, config.LeagueID, teamID, stageID)
+			   status, err := database.GetStandingStatus(db, league.ID, teamID, stageID)
 			   if err != nil {
 				   log.Printf("Error checking standing status for team %s: %v", apiStanding.TournamentTeamName, err)
 				   continue
@@ -93,9 +84,9 @@ func ScrapeStandings(db *sql.DB) error {
 			   // ถ้าไม่มี row หรือ status=1 (ON) ให้บันทึก/อัปเดตได้
 			   err = database.InsertOrUpdateStanding(db, standingDB)
 			   if err != nil {
-				   log.Printf("Error saving standing for team %s in league %s to DB: %v", apiStanding.TournamentTeamName, configName, err)
+				   log.Printf("Error saving standing for team %s in league %s to DB: %v", apiStanding.TournamentTeamName, league.Name, err)
 			   }
-		}
+		   }
+	   }
+	   return nil
 	}
-	return nil
-}
