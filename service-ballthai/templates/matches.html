@@ -131,7 +131,8 @@
     function scrapeMatches() {
         if (!confirm('ต้องการดึงข้อมูลแมทช์จากแหล่งข้อมูลภายนอกใช่หรือไม่?')) return;
         document.getElementById('loadingSpinner').style.display = 'block';
-        fetch('http://localhost:8080/scraper/matches')
+        const baseUrl = window.location.origin;
+        fetch(baseUrl + '/scraper/matches')
             .then(res => res.text())
             .then(text => {
                 alert('ผลลัพธ์: ' + text);
