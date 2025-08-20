@@ -1,13 +1,61 @@
 package scraper
 
 import (
-	"database/sql"
-	"fmt"
-	"log"
-
-	"go-ballthai-scraper/database" // แก้ไข: ตรวจสอบให้แน่ใจว่าชื่อโมดูลตรงกับ go.mod ของคุณ
-	"go-ballthai-scraper/models"   // แก้ไข: ตรวจสอบให้แน่ใจว่าชื่อโมดูลตรงกับ go.mod ของคุณ
+		"database/sql"
+		"fmt"
+		"log"
+		"path"
+		"go-ballthai-scraper/database"
+		"go-ballthai-scraper/models"
 )
+
+// ensureTeamAndLogo ตรวจสอบและอัปเดตข้อมูลทีมและโลโก้ในตาราง teams
+func ensureTeamAndLogo(db *sql.DB, teamName string) error {
+	tID, err := database.GetTeamIDByThaiName(db, teamName, "")
+	needUpdate := false
+	if err == nil {
+		// ตรวจสอบโลโก้ ถ้าไม่มีโลโก้ให้ดึงใหม่
+		var logo sql.NullString
+		err2 := db.QueryRow("SELECT logo_url FROM teams WHERE id = ?", tID).Scan(&logo)
+		if err2 != nil || !logo.Valid || logo.String == "" {
+			needUpdate = true
+		}
+	} else {
+		needUpdate = true
+	}
+	if needUpdate {
+		teams, _ := FetchTeamsByLeagueID("")
+		for _, team := range teams {
+			if team.Name == teamName {
+				baseName := team.NameEN
+				if baseName == "" {
+					baseName = slugify(team.Name)
+				}
+				var logoPath string
+				if team.Logo != "" {
+					ext := path.Ext(team.Logo)
+					if ext == "" {
+						ext = ".png"
+					}
+					fileName := sanitizeFileName(baseName) + ext
+					logoPath = "/img/teams/" + fileName
+					_ = downloadLogoToFolder(team.Logo, baseName)
+				}
+				teamDB := models.TeamDB{
+					NameTH:   team.Name,
+					NameEN:   sql.NullString{String: team.NameEN, Valid: team.NameEN != ""},
+					LogoURL:  sql.NullString{String: logoPath, Valid: logoPath != ""},
+					Website:  sql.NullString{String: team.Website, Valid: team.Website != ""},
+					Shop:     sql.NullString{String: team.Shop, Valid: team.Shop != ""},
+				}
+				_ = database.InsertOrUpdateTeam(db, teamDB)
+				break
+			}
+		}
+	}
+	return nil
+}
+
 
 // scrapeMatchesByConfig เป็นฟังก์ชันทั่วไปสำหรับจัดการการกำหนดค่าการ scrape แมตช์ต่างๆ
 func scrapeMatchesByConfig(db *sql.DB, baseURL string, pages []int, tournamentParam string, leagueType string, dbLeagueID int) error {
@@ -44,23 +92,22 @@ func scrapeMatchesByConfig(db *sql.DB, baseURL string, pages []int, tournamentPa
 
 			// ไม่ต้องดาวน์โหลดโลโก้ซ้ำที่นี่ เพราะ InsertOrUpdateTeam จะจัดการให้แล้ว
 
-			// รับ Home Team ID (หาเฉพาะใน DB ไม่ insert/update)
-			homeTeamID := sql.NullInt64{Valid: false}
-			if apiMatch.HomeTeamName != "" {
-				tID, err := database.GetTeamIDByThaiName(db, apiMatch.HomeTeamName, "")
-				if err == nil {
-					homeTeamID = sql.NullInt64{Int64: int64(tID), Valid: true}
-				}
-			}
-
-			// รับ Away Team ID (หาเฉพาะใน DB ไม่ insert/update)
-			awayTeamID := sql.NullInt64{Valid: false}
-			if apiMatch.AwayTeamName != "" {
-				tID, err := database.GetTeamIDByThaiName(db, apiMatch.AwayTeamName, "")
-				if err == nil {
-					awayTeamID = sql.NullInt64{Int64: int64(tID), Valid: true}
-				}
-			}
+			   // รับ Home Team ID
+			   homeTeamID := sql.NullInt64{Valid: false}
+			   if apiMatch.HomeTeamName != "" {
+				   tID, err := database.GetTeamIDByThaiName(db, apiMatch.HomeTeamName, "")
+				   if err == nil {
+					   homeTeamID = sql.NullInt64{Int64: int64(tID), Valid: true}
+				   }
+			   }
+			   // รับ Away Team ID
+			   awayTeamID := sql.NullInt64{Valid: false}
+			   if apiMatch.AwayTeamName != "" {
+				   tID, err := database.GetTeamIDByThaiName(db, apiMatch.AwayTeamName, "")
+				   if err == nil {
+					   awayTeamID = sql.NullInt64{Int64: int64(tID), Valid: true}
+				   }
+			   }
 
 			// รับ Channel ID (Main TV)
 			channelID := sql.NullInt64{Valid: false}
