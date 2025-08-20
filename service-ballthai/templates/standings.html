@@ -11,14 +11,39 @@
     {{ template "_nav.html" . }}
     <!-- ส่วนอื่น ๆ ของ body เช่น container standings, league_select, stageZoneContainer, standingsContainer -->
     <div id="mainContainer" class="container">
-        <div style="margin-bottom:1rem">
+        <div style="margin-bottom:1rem; display: flex; align-items: center; gap: 10px;">
             <label>เลือกลีก:</label>
             <select id="league_select" class="search-input"></select>
+            <button id="scrapeStandingBtn" class="btn-primary" onclick="scrapeStanding()">🔄 ดึงตารางคะแนน</button>
         </div>
         <div id="stageZoneContainer"></div>
         <div id="standingsContainer"></div>
     </div>
     <script src="/static/js/standing.js"></script>
+</body>
+
+<script>
+function scrapeStanding() {
+    if (!confirm('ต้องการดึงข้อมูลตารางคะแนนจากแหล่งข้อมูลภายนอกใช่หรือไม่?')) return;
+    const btn = document.getElementById('scrapeStandingBtn');
+    btn.disabled = true;
+    btn.textContent = 'กำลังดึง...';
+    const baseUrl = window.location.origin;
+    fetch(baseUrl + '/scraper/standing')
+        .then(res => res.text())
+        .then(text => {
+            alert('ผลลัพธ์: ' + text);
+            if (typeof fetchStandings === 'function') fetchStandings();
+        })
+        .catch(err => {
+            alert('ดึงข้อมูลไม่สำเร็จ: ' + err.message);
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.textContent = '🔄 ดึงตารางคะแนน';
+        });
+}
+</script>
 </body>
 </body>
 </html>
