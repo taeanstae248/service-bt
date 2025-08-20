@@ -61,14 +61,8 @@ func ScrapePlayersHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Database not initialized", http.StatusInternalServerError)
 		return
 	}
-	tournamentID := 1 // default
-	if tid := r.URL.Query().Get("tournament_id"); tid != "" {
-		id, err := strconv.Atoi(tid)
-		if err == nil {
-			tournamentID = id
-		}
-	}
-	err := scraper.ScrapePlayers(db, tournamentID)
+	// tournamentID ไม่ได้ใช้แล้ว เพราะ ScrapePlayers ไม่รับ argument นี้
+	err := scraper.ScrapePlayers(db)
 	if err != nil {
 		log.Println("Scrape players error:", err)
 		http.Error(w, "Scrape players error", http.StatusInternalServerError)

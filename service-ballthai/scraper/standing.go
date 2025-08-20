@@ -1,13 +1,10 @@
+
 package scraper
 
 import (
 	"database/sql"
 	"log"
-
-	// "fmt" // Removed: fmt is not directly used in this file
-	// The 'fmt' package was imported but not used, causing a compile error.
-	// It has been removed.
-
+	"fmt"
 	"go-ballthai-scraper/database" // ตรวจสอบให้แน่ใจว่าชื่อโมดูลตรงกับ go.mod ของคุณ
 	"go-ballthai-scraper/models"   // ตรวจสอบให้แน่ใจว่าชื่อโมดูลตรงกับ go.mod ของคุณ
 )
