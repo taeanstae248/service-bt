@@ -16,3 +16,4 @@ func GetTeamLogoByName(db *sql.DB, nameTh string) (string, error) {
 	}
 	return "", nil
 }
+  
