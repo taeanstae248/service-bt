@@ -451,15 +451,14 @@ func GetMatches(w http.ResponseWriter, r *http.Request) {
 	leagueName := r.URL.Query().Get("league")
 
 	// Map league short code (t1, t2, t3, t4) to full name if needed
-	leagueCodeMap := map[string]string{
-		"t1": "ไทยลีก 1",
-		"t2": "ไทยลีก 2",
-		"t3": "ไทยลีก 3",
-		"fa": "FA Cup",
-		"league_cup": "League Cup",
-		"bgc": "BGC Cup",
-		"samipro": "Samipro",
-	}
+       leagueCodeMap := map[string]string{
+	       "t1": "ไทยลีก 1",
+	       "t3": "ไทยลีก 3",
+	       "fa": "FA Cup",
+	       "league_cup": "League Cup",
+	       "bgc": "BGC Cup",
+	       "samipro": "Samipro",
+       }
 	if val, ok := leagueCodeMap[strings.ToLower(leagueName)]; ok {
 		leagueName = val
 	}
@@ -497,7 +496,8 @@ func GetMatches(w http.ResponseWriter, r *http.Request) {
 		 SELECT m.id, ht.name_th as home_team, at.name_th as away_team, 
 			 m.home_score, m.away_score, m.start_date, m.start_time, s.name as stadium,
 			 m.match_status, m.league_id, l.name as league_name,
-			 ht.team_post_ballthai as team_post_home, at.team_post_ballthai as team_post_away
+			 ht.team_post_ballthai as team_post_home, at.team_post_ballthai as team_post_away,
+			 m.channel_id, m.live_channel_id
 		 FROM matches m
 		 LEFT JOIN teams ht ON m.home_team_id = ht.id
 		 LEFT JOIN teams at ON m.away_team_id = at.id
@@ -554,40 +554,50 @@ func GetMatches(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	var matches []Match
-	for rows.Next() {
-		var match Match
-		if err := rows.Scan(&match.ID, &match.HomeTeam, &match.AwayTeam,
-			&match.HomeScore, &match.AwayScore, &match.StartDate, &match.StartTime,
-			&match.Stadium, &match.Status, &match.LeagueID, &match.LeagueName,
-			&match.TeamPostHome, &match.TeamPostAway); err != nil {
-			http.Error(w, fmt.Sprintf("Scan error: %v", err), http.StatusInternalServerError)
-			return
-		}
-		// ถ้าไม่มีข้อมูล team_post_away ให้แสดงเป็น "0"
-		if match.TeamPostAway == nil || *match.TeamPostAway == "" {
-			zero := "0"
-			match.TeamPostAway = &zero
-		}
-		// ถ้า status ว่าง ให้เติม "ADD"
-		if match.Status == "" {
-			match.Status = "ADD"
-		}
-		// เพิ่มเติม: ให้ match.MatchStatus = match.Status เพื่อให้ JS ใช้ได้
-		match.MatchStatus = match.Status
+	   var matches []Match
+	   for rows.Next() {
+		   var match Match
+		   var channelID, liveChannelID sql.NullInt64
+		   if err := rows.Scan(&match.ID, &match.HomeTeam, &match.AwayTeam,
+			   &match.HomeScore, &match.AwayScore, &match.StartDate, &match.StartTime,
+			   &match.Stadium, &match.Status, &match.LeagueID, &match.LeagueName,
+			   &match.TeamPostHome, &match.TeamPostAway,
+			   &channelID, &liveChannelID); err != nil {
+			   http.Error(w, fmt.Sprintf("Scan error: %v", err), http.StatusInternalServerError)
+			   return
+		   }
+		   if channelID.Valid {
+			   v := int(channelID.Int64)
+			   match.ChannelID = &v
+		   }
+		   if liveChannelID.Valid {
+			   v := int(liveChannelID.Int64)
+			   match.LiveChannelID = &v
+		   }
+		   // ถ้าไม่มีข้อมูล team_post_away ให้แสดงเป็น "0"
+		   if match.TeamPostAway == nil || *match.TeamPostAway == "" {
+			   zero := "0"
+			   match.TeamPostAway = &zero
+		   }
+		   // ถ้า status ว่าง ให้เติม "ADD"
+		   if match.Status == "" {
+			   match.Status = "ADD"
+		   }
+		   // เพิ่มเติม: ให้ match.MatchStatus = match.Status เพื่อให้ JS ใช้ได้
+		   match.MatchStatus = match.Status
 
-		// ดึงโลโก้ทีมเหย้า/เยือน
-		homeLogo, err1 := database.GetTeamLogoByName(DB, match.HomeTeam)
-		awayLogo, err2 := database.GetTeamLogoByName(DB, match.AwayTeam)
-		if err1 == nil && homeLogo != "" {
-			match.HomeLogo = &homeLogo
-		}
-		if err2 == nil && awayLogo != "" {
-			match.AwayLogo = &awayLogo
-		}
+		   // ดึงโลโก้ทีมเหย้า/เยือน
+		   homeLogo, err1 := database.GetTeamLogoByName(DB, match.HomeTeam)
+		   awayLogo, err2 := database.GetTeamLogoByName(DB, match.AwayTeam)
+		   if err1 == nil && homeLogo != "" {
+			   match.HomeLogo = &homeLogo
+		   }
+		   if err2 == nil && awayLogo != "" {
+			   match.AwayLogo = &awayLogo
+		   }
 
-		matches = append(matches, match)
-	}
+		   matches = append(matches, match)
+	   }
 
 	response := APIResponse{
 		Success: true,
