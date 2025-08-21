@@ -163,26 +163,56 @@ func splitPath(path string) []string {
 
 // GetStandings คืนข้อมูล standings ตาม league_id
 func GetStandings(w http.ResponseWriter, r *http.Request) {
+       // ใช้ leagueNameMap สำหรับชื่อเต็มลีก
+       leagueNameMap := map[string]string{
+	       "t1": "ไทยลีก 1",
+	       "t2": "ไทยลีก 2",
+	       "t3": "ไทยลีก 3",
+	       "fa": "FA Cup",
+	       "league_cup": "League Cup",
+	       "bgc": "BGC Cup",
+	       "samipro": "Samipro",
+       }
 	w.Header().Set("Content-Type", "application/json")
-	leagueIDStr := r.URL.Query().Get("league_id")
-	if leagueIDStr == "" {
-		http.Error(w, `{"success": false, "error": "league_id is required"}`, http.StatusBadRequest)
-		return
-	}
-	leagueID, err := strconv.Atoi(leagueIDStr)
-	if err != nil {
-		http.Error(w, `{"success": false, "error": "invalid league_id"}`, http.StatusBadRequest)
-		return
-	}
-	standings, err := database.GetStandingsByLeagueID(database.DB, leagueID)
-	if err != nil {
-		// log error detail for debugging
-		println("[ERROR] GetStandingsByLeagueID:", err.Error())
-		http.Error(w, `{"success": false, "error": "failed to fetch standings"}`, http.StatusInternalServerError)
-		return
-	}
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"data":    standings,
-	})
+       leagueIDStr := r.URL.Query().Get("league_id")
+       if leagueIDStr == "" {
+	       http.Error(w, `{"success": false, "error": "league_id is required"}`, http.StatusBadRequest)
+	       return
+       }
+       // รองรับ league_id เป็นตัวเลข หรือ t1/t2/t3 ที่มีใน leagueNameMap เท่านั้น
+       var leagueID int
+       var err error
+       if _, ok := leagueNameMap[leagueIDStr]; ok {
+	       // ถ้าเป็น t1/t2/t3 ให้ map เป็นเลข
+	       switch leagueIDStr {
+	       case "t1": leagueID = 1
+	       case "t2": leagueID = 2
+	       case "t3": leagueID = 3
+	       default:
+		       http.Error(w, `{"success": false, "error": "invalid league_id"}`, http.StatusBadRequest)
+		       return
+	       }
+       } else {
+	       leagueID, err = strconv.Atoi(leagueIDStr)
+	       if err != nil {
+		       http.Error(w, `{"success": false, "error": "invalid league_id"}`, http.StatusBadRequest)
+		       return
+	       }
+       }
+       standings, err := database.GetStandingsByLeagueID(database.DB, leagueID)
+       if err != nil {
+	       // log error detail for debugging
+	       println("[ERROR] GetStandingsByLeagueID:", err.Error())
+	       http.Error(w, `{"success": false, "error": "failed to fetch standings"}`, http.StatusInternalServerError)
+	       return
+       }
+       leagueName := ""
+       if name, ok := leagueNameMap[leagueIDStr]; ok {
+	       leagueName = name
+       }
+       json.NewEncoder(w).Encode(map[string]interface{}{
+	       "success": true,
+	       "data":    standings,
+	       "league_name": leagueName,
+       })
 }
