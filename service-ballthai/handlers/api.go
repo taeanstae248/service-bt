@@ -72,6 +72,8 @@ type Match struct {
 	} `json:"live_channel,omitempty"`
 	HomeLogo      *string `json:"logo_home,omitempty"`
 	AwayLogo      *string `json:"logo_away,omitempty"`
+	StageID       *int    `json:"stage_id,omitempty"`
+	StageName     *string `json:"stage_name,omitempty"`
 }
 
 type Player struct {
@@ -455,6 +457,7 @@ func GetMatches(w http.ResponseWriter, r *http.Request) {
 	offsetStr := r.URL.Query().Get("offset")
 	leagueIDStr := r.URL.Query().Get("league_id")
 	leagueName := r.URL.Query().Get("league")
+	stageIDStr := r.URL.Query().Get("stage_id")
 
 	// Map league short code (t1, t2, t3, t4) to full name if needed
        leagueCodeMap := map[string]string{
@@ -505,7 +508,8 @@ func GetMatches(w http.ResponseWriter, r *http.Request) {
 				m.match_status, m.league_id, l.name as league_name,
 				ht.team_post_ballthai as team_post_home, at.team_post_ballthai as team_post_away,
 				m.channel_id, c1.name as channel_name, c1.logo_url as channel_logo,
-				m.live_channel_id, c2.name as live_channel_name, c2.logo_url as live_channel_logo
+				m.live_channel_id, c2.name as live_channel_name, c2.logo_url as live_channel_logo,
+				m.stage_id, st.stage_name
 			FROM matches m
 			LEFT JOIN teams ht ON m.home_team_id = ht.id
 			LEFT JOIN teams at ON m.away_team_id = at.id
@@ -513,8 +517,18 @@ func GetMatches(w http.ResponseWriter, r *http.Request) {
 			LEFT JOIN leagues l ON m.league_id = l.id
 			LEFT JOIN channels c1 ON m.channel_id = c1.id
 			LEFT JOIN channels c2 ON m.live_channel_id = c2.id
-			WHERE 1=1
-	   `
+			LEFT JOIN stage st ON m.stage_id = st.id
+			WHERE 1=1`
+	   // Add stage_id filter
+	   if stageIDStr != "" {
+		   if stageID, err := strconv.Atoi(stageIDStr); err == nil {
+			   query += " AND m.stage_id = ?"
+			   args = append(args, stageID)
+		   } else {
+			   http.Error(w, "Invalid stage_id parameter", http.StatusBadRequest)
+			   return
+		   }
+	   }
 	// Filter by season date range (ถ้ามี season)
 	if seasonName != "" {
 		query += " AND m.start_date >= ? AND m.start_date <= ?"
@@ -557,25 +571,28 @@ func GetMatches(w http.ResponseWriter, r *http.Request) {
 	}
 	args = append(args, limit, offset)
 
-	rows, err := DB.Query(query, args...)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
-		return
-	}
-	defer rows.Close()
+       rows, err := DB.Query(query, args...)
+       if err != nil {
+	       http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+	       return
+       }
+       defer rows.Close()
 
-	   var matches []Match
+       var matches []Match
 	   for rows.Next() {
 		   var match Match
 		   var channelID, liveChannelID sql.NullInt64
 		   var channelName, channelLogo sql.NullString
 		   var liveChannelName, liveChannelLogo sql.NullString
+		   var stageID sql.NullInt64
+		   var stageName sql.NullString
 		   if err := rows.Scan(&match.ID, &match.HomeTeam, &match.AwayTeam,
 			   &match.HomeScore, &match.AwayScore, &match.StartDate, &match.StartTime,
 			   &match.Stadium, &match.Status, &match.LeagueID, &match.LeagueName,
 			   &match.TeamPostHome, &match.TeamPostAway,
 			   &channelID, &channelName, &channelLogo,
-			   &liveChannelID, &liveChannelName, &liveChannelLogo); err != nil {
+			   &liveChannelID, &liveChannelName, &liveChannelLogo,
+			   &stageID, &stageName); err != nil {
 			   http.Error(w, fmt.Sprintf("Scan error: %v", err), http.StatusInternalServerError)
 			   return
 		   }
@@ -619,15 +636,25 @@ func GetMatches(w http.ResponseWriter, r *http.Request) {
 			   match.AwayLogo = &awayLogo
 		   }
 
+		   // Set stage_id and stage_name in response
+		   if stageID.Valid {
+			   v := int(stageID.Int64)
+			   match.StageID = &v
+		   }
+		   if stageName.Valid {
+			   s := stageName.String
+			   match.StageName = &s
+		   }
+
 		   matches = append(matches, match)
 	   }
 
-	response := APIResponse{
-		Success: true,
-		Data:    matches,
-	}
+	   response := APIResponse{
+		   Success: true,
+		   Data:    matches,
+	   }
 
-	json.NewEncoder(w).Encode(response)
+	   json.NewEncoder(w).Encode(response)
 }
 
 // GetStages returns unique stage_name from stage table
