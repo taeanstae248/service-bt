@@ -199,16 +199,38 @@ func GetStandings(w http.ResponseWriter, r *http.Request) {
 		       return
 	       }
        }
-       standings, err := database.GetStandingsByLeagueID(database.DB, leagueID)
-       if err != nil {
-	       // log error detail for debugging
-	       println("[ERROR] GetStandingsByLeagueID:", err.Error())
-	       http.Error(w, `{"success": false, "error": "failed to fetch standings"}`, http.StatusInternalServerError)
-	       return
-       }
+	// ...existing code...
        leagueName := ""
        if name, ok := leagueNameMap[leagueIDStr]; ok {
 	       leagueName = name
+       }
+       // รองรับ stage (stage_id) จาก query string
+	stageStr := r.URL.Query().Get("stage")
+	var standings []models.StandingDB
+	if stageStr != "" {
+	       // ถ้า stage เป็นตัวเลข ให้ filter ด้วย stage_id
+	       var stageID sql.NullInt64
+	       if sID, err := strconv.ParseInt(stageStr, 10, 64); err == nil {
+		       stageID.Int64 = sID
+		       stageID.Valid = true
+	       } else {
+		       // ถ้าไม่ใช่ตัวเลข ให้ถือว่าไม่ filter stage_id (หรือจะ map ชื่อเป็น id เพิ่มเติมได้)
+		       stageID.Valid = false
+	       }
+	       standings, err = database.GetStandingsByLeagueIDAndStageID(database.DB, leagueID, stageID)
+	       if err != nil {
+		       println("[ERROR] GetStandingsByLeagueIDAndStageID:", err.Error())
+		       http.Error(w, `{"success": false, "error": "failed to fetch standings by stage"}`, http.StatusInternalServerError)
+		       return
+	       }
+       } else {
+	       standings, err = database.GetStandingsByLeagueID(database.DB, leagueID)
+	       if err != nil {
+		       // log error detail for debugging
+		       println("[ERROR] GetStandingsByLeagueID:", err.Error())
+		       http.Error(w, `{"success": false, "error": "failed to fetch standings"}`, http.StatusInternalServerError)
+		       return
+	       }
        }
        json.NewEncoder(w).Encode(map[string]interface{}{
 	       "success": true,
