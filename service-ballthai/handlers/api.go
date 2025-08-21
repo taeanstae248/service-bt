@@ -62,10 +62,16 @@ type Match struct {
 	LeagueName    *string `json:"league_name,omitempty"`
 	TeamPostHome  *string `json:"team_post_home,omitempty"`
 	TeamPostAway  *string `json:"team_post_away,omitempty"`
-	ChannelID     *int    `json:"channel_id,omitempty"`
-	LiveChannelID *int    `json:"live_channel_id,omitempty"`
-		HomeLogo      *string `json:"logo_home,omitempty"`
-		AwayLogo      *string `json:"logo_away,omitempty"`
+	Channel       *struct {
+		Name    string  `json:"name"`
+		LogoURL string  `json:"logo_url"`
+	} `json:"channel,omitempty"`
+	LiveChannel *struct {
+		Name    string  `json:"name"`
+		LogoURL string  `json:"logo_url"`
+	} `json:"live_channel,omitempty"`
+	HomeLogo      *string `json:"logo_home,omitempty"`
+	AwayLogo      *string `json:"logo_away,omitempty"`
 }
 
 type Player struct {
@@ -493,19 +499,22 @@ func GetMatches(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	query := `
-		 SELECT m.id, ht.name_th as home_team, at.name_th as away_team, 
-			 m.home_score, m.away_score, m.start_date, m.start_time, s.name as stadium,
-			 m.match_status, m.league_id, l.name as league_name,
-			 ht.team_post_ballthai as team_post_home, at.team_post_ballthai as team_post_away,
-			 m.channel_id, m.live_channel_id
-		 FROM matches m
-		 LEFT JOIN teams ht ON m.home_team_id = ht.id
-		 LEFT JOIN teams at ON m.away_team_id = at.id
-		 LEFT JOIN stadiums s ON ht.stadium_id = s.id
-		 LEFT JOIN leagues l ON m.league_id = l.id
-		 WHERE 1=1
-	`
+	   query := `
+			SELECT m.id, ht.name_th as home_team, at.name_th as away_team, 
+				m.home_score, m.away_score, m.start_date, m.start_time, s.name as stadium,
+				m.match_status, m.league_id, l.name as league_name,
+				ht.team_post_ballthai as team_post_home, at.team_post_ballthai as team_post_away,
+				m.channel_id, c1.name as channel_name, c1.logo_url as channel_logo,
+				m.live_channel_id, c2.name as live_channel_name, c2.logo_url as live_channel_logo
+			FROM matches m
+			LEFT JOIN teams ht ON m.home_team_id = ht.id
+			LEFT JOIN teams at ON m.away_team_id = at.id
+			LEFT JOIN stadiums s ON ht.stadium_id = s.id
+			LEFT JOIN leagues l ON m.league_id = l.id
+			LEFT JOIN channels c1 ON m.channel_id = c1.id
+			LEFT JOIN channels c2 ON m.live_channel_id = c2.id
+			WHERE 1=1
+	   `
 	// Filter by season date range (ถ้ามี season)
 	if seasonName != "" {
 		query += " AND m.start_date >= ? AND m.start_date <= ?"
@@ -559,21 +568,34 @@ func GetMatches(w http.ResponseWriter, r *http.Request) {
 	   for rows.Next() {
 		   var match Match
 		   var channelID, liveChannelID sql.NullInt64
+		   var channelName, channelLogo sql.NullString
+		   var liveChannelName, liveChannelLogo sql.NullString
 		   if err := rows.Scan(&match.ID, &match.HomeTeam, &match.AwayTeam,
 			   &match.HomeScore, &match.AwayScore, &match.StartDate, &match.StartTime,
 			   &match.Stadium, &match.Status, &match.LeagueID, &match.LeagueName,
 			   &match.TeamPostHome, &match.TeamPostAway,
-			   &channelID, &liveChannelID); err != nil {
+			   &channelID, &channelName, &channelLogo,
+			   &liveChannelID, &liveChannelName, &liveChannelLogo); err != nil {
 			   http.Error(w, fmt.Sprintf("Scan error: %v", err), http.StatusInternalServerError)
 			   return
 		   }
-		   if channelID.Valid {
-			   v := int(channelID.Int64)
-			   match.ChannelID = &v
+		   if channelID.Valid && channelName.Valid {
+			   match.Channel = &struct {
+				   Name    string  `json:"name"`
+				   LogoURL string  `json:"logo_url"`
+			   }{
+				   Name:    channelName.String,
+				   LogoURL: channelLogo.String,
+			   }
 		   }
-		   if liveChannelID.Valid {
-			   v := int(liveChannelID.Int64)
-			   match.LiveChannelID = &v
+		   if liveChannelID.Valid && liveChannelName.Valid {
+			   match.LiveChannel = &struct {
+				   Name    string  `json:"name"`
+				   LogoURL string  `json:"logo_url"`
+			   }{
+				   Name:    liveChannelName.String,
+				   LogoURL: liveChannelLogo.String,
+			   }
 		   }
 		   // ถ้าไม่มีข้อมูล team_post_away ให้แสดงเป็น "0"
 		   if match.TeamPostAway == nil || *match.TeamPostAway == "" {
