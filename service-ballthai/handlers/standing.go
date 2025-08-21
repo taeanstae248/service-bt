@@ -232,9 +232,56 @@ func GetStandings(w http.ResponseWriter, r *http.Request) {
 		       return
 	       }
        }
+       // เพิ่ม stage_name ให้แต่ละ standing ถ้ามี stage_id
+       type standingAPI struct {
+	       ID             int     `json:"id"`
+	       LeagueID       int     `json:"league_id"`
+	       TeamID         int     `json:"team_id"`
+	       TeamName       *string `json:"team_name"`
+	       MatchesPlayed  int     `json:"matches_played"`
+	       Wins           int     `json:"wins"`
+	       Draws          int     `json:"draws"`
+	       Losses         int     `json:"losses"`
+	       GoalsFor       int     `json:"goals_for"`
+	       GoalsAgainst   int     `json:"goals_against"`
+	       GoalDifference int     `json:"goal_difference"`
+	       Points         int     `json:"points"`
+	       CurrentRank    int     `json:"current_rank"`
+	       StageName      string  `json:"stage_name"`
+       }
+       var result []standingAPI
+       for _, s := range standings {
+	       stageName := ""
+	       if s.StageID.Valid {
+		       name, err := database.GetStageNameByID(database.DB, s.StageID.Int64)
+		       if err == nil {
+			       stageName = name
+		       }
+	       }
+	       currentRank := 0
+	       if s.CurrentRank.Valid {
+		       currentRank = int(s.CurrentRank.Int64)
+	       }
+	       result = append(result, standingAPI{
+		       ID:             s.ID,
+		       LeagueID:       s.LeagueID,
+		       TeamID:         s.TeamID,
+		       TeamName:       s.TeamName,
+		       MatchesPlayed:  s.MatchesPlayed,
+		       Wins:           s.Wins,
+		       Draws:          s.Draws,
+		       Losses:         s.Losses,
+		       GoalsFor:       s.GoalsFor,
+		       GoalsAgainst:   s.GoalsAgainst,
+		       GoalDifference: s.GoalDifference,
+		       Points:         s.Points,
+		       CurrentRank:    currentRank,
+		       StageName:      stageName,
+	       })
+       }
        json.NewEncoder(w).Encode(map[string]interface{}{
 	       "success": true,
-	       "data":    standings,
+	       "data":    result,
 	       "league_name": leagueName,
        })
 }
