@@ -267,6 +267,8 @@ func main() {
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 	// Serve team logos from /img/teams/ -> ./img/teams/
 	router.PathPrefix("/img/teams/").Handler(http.StripPrefix("/img/teams/", http.FileServer(http.Dir("img/teams/"))))
+	// Serve channel images from /img/channels/ -> ./img/channels/
+	router.PathPrefix("/img/channels/").Handler(http.StripPrefix("/img/channels/", http.FileServer(http.Dir("img/channels/"))))
 
 	// Redirect root to login
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
