@@ -453,6 +453,7 @@ func GetMatches(w http.ResponseWriter, r *http.Request) {
 	// Map league short code (t1, t2, t3, t4) to full name if needed
        leagueCodeMap := map[string]string{
 	       "t1": "ไทยลีก 1",
+		   "t2": "ไทยลีก 2",
 	       "t3": "ไทยลีก 3",
 	       "fa": "FA Cup",
 	       "league_cup": "League Cup",
