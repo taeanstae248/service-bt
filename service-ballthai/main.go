@@ -30,7 +30,7 @@ func main() {
    })
    c.Start()
 // ...existing code...
-       // ...existing code...
+	// ...existing code...
 // ...existing code...
        r := mux.NewRouter()
 
@@ -53,6 +53,8 @@ func main() {
 		w.Write([]byte("Update team_post_ballthai completed!"))
 	}).Methods("GET")
 
+	// เพิ่ม route สำหรับอัปโหลดโลโก้ช่อง (channels)
+	r.HandleFunc("/api/channels/{id}/upload-logo", handlers.UploadChannelLogo).Methods("POST")
 	// Debug: log routes ทั้งหมด
 	log.Println("[DEBUG] Registered routes:")
 	r.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {

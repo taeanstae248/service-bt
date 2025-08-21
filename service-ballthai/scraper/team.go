@@ -105,13 +105,6 @@ func slugify(s string) string {
 	}
 
 // sanitizeFileName แปลงชื่อทีมให้เป็นชื่อไฟล์ที่ปลอดภัย
-func sanitizeFileName(name string) string {
-   invalid := []string{"/", "\\", ":", "*", "?", "\"", "<", ">", "|", " "}
-   for _, c := range invalid {
-	   name = strings.ReplaceAll(name, c, "_")
-   }
-   return name
-}
 
 
 

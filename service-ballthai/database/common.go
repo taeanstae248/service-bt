@@ -34,28 +34,40 @@ func GetNationalityID(db *sql.DB, code, name string) (int, error) {
 
 // GetChannelID checks if channel exists by name, inserts if not, and returns ID
 func GetChannelID(db *sql.DB, name, logoURL, channelType string) (int, error) {
-	var channelID int
-	query := "SELECT id FROM channels WHERE REPLACE(name, ' ', '') = REPLACE(?, ' ', '')"
-	err := db.QueryRow(query, name).Scan(&channelID)
+       var channelID int
+       var oldLogo sql.NullString
+       query := "SELECT id, logo_url FROM channels WHERE REPLACE(name, ' ', '') = REPLACE(?, ' ', '')"
+       err := db.QueryRow(query, name).Scan(&channelID, &oldLogo)
 
-	if err == sql.ErrNoRows {
-		// Insert new channel
-		insertQuery := `INSERT INTO channels (name, logo_url, type) VALUES (?, ?, ?)`
-		result, err := db.Exec(insertQuery, name, logoURL, channelType)
-		if err != nil {
-			return 0, fmt.Errorf("failed to insert new channel %s: %w", name, err)
-		}
-		newID, err := result.LastInsertId()
-		if err != nil {
-			return 0, fmt.Errorf("failed to get last insert ID for channel %s: %w", name, err)
-		}
-		log.Printf("Inserted new channel: %s (ID: %d)", name, newID)
-		return int(newID), nil
-	} else if err != nil {
-		return 0, fmt.Errorf("failed to query channel by name %s: %w", name, err)
-	}
-	log.Printf("Found existing channel: %s (ID: %d)", name, channelID)
-	return channelID, nil
+       if err == sql.ErrNoRows {
+	       // Insert new channel
+	       insertQuery := `INSERT INTO channels (name, logo_url, type) VALUES (?, ?, ?)`
+	       result, err := db.Exec(insertQuery, name, logoURL, channelType)
+	       if err != nil {
+		       return 0, fmt.Errorf("failed to insert new channel %s: %w", name, err)
+	       }
+	       newID, err := result.LastInsertId()
+	       if err != nil {
+		       return 0, fmt.Errorf("failed to get last insert ID for channel %s: %w", name, err)
+	       }
+	       log.Printf("Inserted new channel: %s (ID: %d)", name, newID)
+	       return int(newID), nil
+       } else if err != nil {
+	       return 0, fmt.Errorf("failed to query channel by name %s: %w", name, err)
+       }
+
+       // Update logo_url ถ้าเปลี่ยน
+       if logoURL != "" && (!oldLogo.Valid || oldLogo.String != logoURL) {
+	       updateQuery := `UPDATE channels SET logo_url = ? WHERE id = ?`
+	       _, err := db.Exec(updateQuery, logoURL, channelID)
+	       if err != nil {
+		       log.Printf("Warning: Failed to update channel logo for ID %d: %v", channelID, err)
+	       } else {
+		       log.Printf("Updated channel logo for ID %d: %s", channelID, logoURL)
+	       }
+       }
+       log.Printf("Found existing channel: %s (ID: %d)", name, channelID)
+       return channelID, nil
 }
 
 // GetLeagueID checks if league exists by name, inserts if not, and returns ID
