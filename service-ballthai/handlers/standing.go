@@ -258,6 +258,19 @@ func GetStandings(w http.ResponseWriter, r *http.Request) {
 			       stageName = name
 		       }
 	       }
+	       // fallback: ถ้า stageName ยังว่าง ให้ลองใช้ s.TeamName (กรณี scraper เคยบันทึก stage_name ลง DB โดยตรง)
+	       if stageName == "" && s.TeamName != nil {
+		       // ลอง parse จาก team_name ถ้ามีรูปแบบ "... (stage)" เช่น "ทีม A (โซนเหนือ)"
+		       tn := *s.TeamName
+		       if idx := len(tn) - 1; idx > 0 && tn[idx] == ')' {
+			       if open := idx - 1; open > 0 {
+				       for ; open >= 0 && tn[open] != '('; open-- {}
+				       if open >= 0 && open < idx-1 {
+					       stageName = tn[open+1 : idx]
+				       }
+			       }
+		       }
+	       }
 	       currentRank := 0
 	       if s.CurrentRank.Valid {
 		       currentRank = int(s.CurrentRank.Int64)

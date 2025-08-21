@@ -5,8 +5,7 @@ async function fetchLeagues() {
     try {
         const res = await fetch('/api/leagues');
         data = await res.json();
-        console.log('DEBUG: leagues api data', data);
-    } catch(e) {
+    } catch (e) {
         console.error('API /api/leagues error:', e);
         data = { success: false, data: [] };
     }
@@ -20,62 +19,52 @@ async function fetchLeagues() {
 }
 
 let lastStageDropdown = null;
-async function renderStandingsTableWithStage(standings, stagesData) {
-    let stagesMap = {};
-    window._debugStagesMap = stagesMap;
+async function renderStandingsTableWithStage(standings) {
     window._debugStandings = standings;
-    // ถ้าไม่ได้ส่ง stagesData ให้ใช้ window._lastStagesData
-    if (!stagesData && window._lastStagesData) stagesData = window._lastStagesData;
-    if (Array.isArray(stagesData)) {
-        stagesData.forEach(s => {
-            stagesMap[String(s.id)] = s.stage_name;
-        });
-        window._lastStagesData = stagesData;
-    }
-    const stages = {};
+    // 1. หา stage_name ที่มีอยู่จริงใน standings ของลีกนี้
+    const stagesInStandings = {};
     if (!standings || !Array.isArray(standings)) {
         console.error('standings ไม่ถูกต้อง:', standings);
         return;
     }
     standings.forEach(s => {
-        if(s.stage_id && s.stage_id.Valid) {
-            const idStr = String(s.stage_id.Int64);
-            let stageName = stagesMap[idStr];
-            if(!stages[idStr]) stages[idStr] = stageName || idStr;
+        if(s.stage_name && typeof s.stage_name === 'string' && s.stage_name.trim() !== '') {
+            if(!stagesInStandings[s.stage_name]) stagesInStandings[s.stage_name] = true;
         }
     });
-    const stageIds = Object.keys(stages);
+    const stageNames = Object.keys(stagesInStandings);
     const stageZoneContainer = document.getElementById('stageZoneContainer');
-    let selectedStageId = null;
-    if(stageIds.length > 1) {
+    let selectedStageName = null;
+    if(stageNames.length > 1) {
         let html = '<label>เลือกโซน/รอบ:</label> <select id="stage_select" class="search-input">';
-        stageIds.forEach(id => {
-            let stageName = stagesMap[String(id)] || `โซน/รอบ ${id}`;
-            html += `<option value="${id}">${stageName}</option>`;
+        stageNames.forEach(name => {
+            html += `<option value="${name}">${name}</option>`;
         });
         html += '</select>';
         stageZoneContainer.innerHTML = html;
-        selectedStageId = stageIds[0];
+        selectedStageName = stageNames[0];
         if(window.lastStageDropdown) window.lastStageDropdown.onchange = null;
         const dropdown = document.getElementById('stage_select');
+        // set dropdown value to selectedStageName (from state) after rendering
+        if (renderStandingsTableWithStage._selectedStageName) {
+            selectedStageName = renderStandingsTableWithStage._selectedStageName;
+            dropdown.value = selectedStageName;
+        } else {
+            renderStandingsTableWithStage._selectedStageName = selectedStageName;
+        }
         dropdown.onchange = function() {
-            renderStandingsTableWithStage._selectedStageId = this.value;
+            renderStandingsTableWithStage._selectedStageName = this.value;
             renderStandingsTableWithStage._allStandings = standings;
-            // เรียกใหม่พร้อม stagesData เดิมเสมอ
-            renderStandingsTableWithStage(standings, window._lastStagesData);
+            renderStandingsTableWithStage(standings);
         };
         window.lastStageDropdown = dropdown;
-        if(renderStandingsTableWithStage._selectedStageId) {
-            selectedStageId = renderStandingsTableWithStage._selectedStageId;
-        } else {
-            renderStandingsTableWithStage._selectedStageId = selectedStageId;
-        }
     } else {
         stageZoneContainer.innerHTML = '';
+        renderStandingsTableWithStage._selectedStageName = null;
     }
     let filtered = standings;
-    if(stageIds.length > 1 && renderStandingsTableWithStage._selectedStageId) {
-        filtered = standings.filter(s => s.stage_id && s.stage_id.Valid && String(s.stage_id.Int64) === String(renderStandingsTableWithStage._selectedStageId));
+    if(stageNames.length > 1 && renderStandingsTableWithStage._selectedStageName) {
+        filtered = standings.filter(s => s.stage_name === renderStandingsTableWithStage._selectedStageName);
     }
     let html = `<table class="standings-table" border="1" cellpadding="4" style="width:100%;margin-top:1rem;">
         <thead><tr>
@@ -236,23 +225,6 @@ function editStanding(id) {
     showEditStandingModal(standing);
 }
 
-// โหลด stages ทั้งหมดไว้ล่วงหน้า (cache)
-let _cachedStagesData = null;
-async function fetchStages() {
-    if (_cachedStagesData) return _cachedStagesData;
-    try {
-        const res = await fetch('/api/stages');
-        const data = await res.json();
-        if (data && data.success && Array.isArray(data.data)) {
-            _cachedStagesData = data.data;
-            return _cachedStagesData;
-        }
-    } catch (e) {
-        console.error('API /api/stages error:', e);
-    }
-    return [];
-}
-
 // เมื่อเลือกลีก ให้โหลด standings ของลีกนั้น
 async function onLeagueChange() {
     const leagueId = document.getElementById('league_select').value;
@@ -272,9 +244,9 @@ async function onLeagueChange() {
     } catch (e) {
         console.error('API /api/standings error:', e);
     }
-    // fetch stages
-    const stagesData = await fetchStages();
-    renderStandingsTableWithStage(standings, stagesData);
+    // reset stage dropdown state ทุกครั้งที่เปลี่ยนลีก
+    renderStandingsTableWithStage._selectedStageName = null;
+    renderStandingsTableWithStage(standings);
 }
 
 // โหลดลีกและ set event handler

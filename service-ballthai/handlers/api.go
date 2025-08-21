@@ -669,32 +669,34 @@ func GetMatches(w http.ResponseWriter, r *http.Request) {
 
 // GetStages returns unique stage_name from stage table
 func GetStages(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	query := `SELECT id, stage_name FROM stage WHERE stage_name IS NOT NULL AND stage_name != '' ORDER BY stage_name`
-	rows, err := DB.Query(query)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
-		return
-	}
-	defer rows.Close()
-	var stages []struct {
-		ID        int    `json:"id"`
-		StageName string `json:"stage_name"`
-	}
-	for rows.Next() {
-		var s struct {
-			ID        int    `json:"id"`
-			StageName string `json:"stage_name"`
-		}
-		if err := rows.Scan(&s.ID, &s.StageName); err != nil {
-			http.Error(w, fmt.Sprintf("Scan error: %v", err), http.StatusInternalServerError)
-			return
-		}
-		stages = append(stages, s)
-	}
-	response := APIResponse{
-		Success: true,
-		Data:    stages,
-	}
-	json.NewEncoder(w).Encode(response)
+       w.Header().Set("Content-Type", "application/json")
+       query := `SELECT id, stage_name, league_id FROM stage WHERE stage_name IS NOT NULL AND stage_name != '' ORDER BY stage_name`
+       rows, err := DB.Query(query)
+       if err != nil {
+	       http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+	       return
+       }
+       defer rows.Close()
+       var stages []struct {
+	       ID        int    `json:"id"`
+	       StageName string `json:"stage_name"`
+	       LeagueID  int    `json:"league_id"`
+       }
+       for rows.Next() {
+	       var s struct {
+		       ID        int    `json:"id"`
+		       StageName string `json:"stage_name"`
+		       LeagueID  int    `json:"league_id"`
+	       }
+	       if err := rows.Scan(&s.ID, &s.StageName, &s.LeagueID); err != nil {
+		       http.Error(w, fmt.Sprintf("Scan error: %v", err), http.StatusInternalServerError)
+		       return
+	       }
+	       stages = append(stages, s)
+       }
+       response := APIResponse{
+	       Success: true,
+	       Data:    stages,
+       }
+       json.NewEncoder(w).Encode(response)
 }
