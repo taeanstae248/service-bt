@@ -457,7 +457,11 @@ func GetMatches(w http.ResponseWriter, r *http.Request) {
 	offsetStr := r.URL.Query().Get("offset")
 	leagueIDStr := r.URL.Query().Get("league_id")
 	leagueName := r.URL.Query().Get("league")
-	stageIDStr := r.URL.Query().Get("stage_id")
+	   // Support both ?stage=... and ?stage_id=... for filtering
+	   stageIDStr := r.URL.Query().Get("stage")
+	   if stageIDStr == "" {
+		   stageIDStr = r.URL.Query().Get("stage_id")
+	   }
 
 	// Map league short code (t1, t2, t3, t4) to full name if needed
        leagueCodeMap := map[string]string{
@@ -525,8 +529,14 @@ func GetMatches(w http.ResponseWriter, r *http.Request) {
 			   query += " AND m.stage_id = ?"
 			   args = append(args, stageID)
 		   } else {
-			   http.Error(w, "Invalid stage_id parameter", http.StatusBadRequest)
-			   return
+			   // Try to look up stage_id by stage_name
+			   id, err := database.GetStageIDByName(DB, stageIDStr)
+			   if err != nil {
+				   http.Error(w, "Invalid stage_id or stage_name parameter", http.StatusBadRequest)
+				   return
+			   }
+			   query += " AND m.stage_id = ?"
+			   args = append(args, id)
 		   }
 	   }
 	// Filter by season date range (ถ้ามี season)
