@@ -286,6 +286,11 @@ async function toggleStandingStatus(id, currentStatus) {
 // เมื่อเลือกลีก ให้โหลด standings ของลีกนั้น
 async function onLeagueChange() {
     const leagueId = document.getElementById('league_select').value;
+    // enable/disable refresh button depending on selection
+    try {
+        const rbtn = document.getElementById('refreshStandingsBtn');
+        if (rbtn) rbtn.disabled = !leagueId;
+    } catch (e) {}
     if (!leagueId) {
         document.getElementById('standingsContainer').innerHTML = '';
         document.getElementById('stageZoneContainer').innerHTML = '';
@@ -326,6 +331,8 @@ async function initStandingsPage() {
                 sel.parentNode.insertBefore(btn, sel.nextSibling);
             }
             btn.onclick = refreshStandings;
+            // start disabled until a league is selected/populated
+            try { btn.disabled = !sel.value; } catch(e){}
         }
     } catch (e) {
         console.warn('failed to attach refresh button', e);
