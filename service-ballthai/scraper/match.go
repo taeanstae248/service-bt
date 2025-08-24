@@ -145,19 +145,47 @@ func scrapeMatchesPage(db *sql.DB, baseURL string, page int, tournamentParam str
 
 		var homeTeamID, awayTeamID int
 		if apiMatch.HomeTeamName != "" {
+			// Ensure team record and logo exist/are downloaded before resolving ID
+			_ = ensureTeamAndLogo(db, apiMatch.HomeTeamName)
 			id, err := database.GetTeamIDByThaiName(db, apiMatch.HomeTeamName, "")
 			if err != nil {
 				log.Printf("Warning: GetTeamIDByThaiName home team '%s' failed: %v", apiMatch.HomeTeamName, err)
 			} else {
 				homeTeamID = id
 			}
+			// If team has external logo, normalize it to local server path
+			if id != 0 {
+				var logo sql.NullString
+				if err2 := db.QueryRow("SELECT logo_url FROM teams WHERE id = ?", id).Scan(&logo); err2 == nil && logo.Valid {
+					if strings.HasPrefix(logo.String, "http://") || strings.HasPrefix(logo.String, "https://") {
+						normalized := database.NormalizeLogoURL(logo.String)
+						if normalized != "" && normalized != logo.String {
+							_, _ = db.Exec("UPDATE teams SET logo_url = ? WHERE id = ?", normalized, id)
+						}
+					}
+				}
+			}
 		}
 		if apiMatch.AwayTeamName != "" {
+			// Ensure team record and logo exist/are downloaded before resolving ID
+			_ = ensureTeamAndLogo(db, apiMatch.AwayTeamName)
 			id, err := database.GetTeamIDByThaiName(db, apiMatch.AwayTeamName, "")
 			if err != nil {
 				log.Printf("Warning: GetTeamIDByThaiName away team '%s' failed: %v", apiMatch.AwayTeamName, err)
 			} else {
 				awayTeamID = id
+			}
+			// If team has external logo, normalize it to local server path
+			if id != 0 {
+				var logo sql.NullString
+				if err2 := db.QueryRow("SELECT logo_url FROM teams WHERE id = ?", id).Scan(&logo); err2 == nil && logo.Valid {
+					if strings.HasPrefix(logo.String, "http://") || strings.HasPrefix(logo.String, "https://") {
+						normalized := database.NormalizeLogoURL(logo.String)
+						if normalized != "" && normalized != logo.String {
+							_, _ = db.Exec("UPDATE teams SET logo_url = ? WHERE id = ?", normalized, id)
+						}
+					}
+				}
 			}
 		}
 

@@ -3,8 +3,11 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"go-ballthai-scraper/models" // ตรวจสอบให้แน่ใจว่าชื่อโมดูลตรงกับ go.mod ของคุณ
@@ -22,13 +25,16 @@ func GetTeamIDByThaiName(db *sql.DB, teamNameThai, teamLogoURL string) (int, err
 	query := "SELECT id FROM teams WHERE REPLACE(name_th, ' ', '') = REPLACE(?, ' ', '')"
 	err := db.QueryRow(query, teamNameThai).Scan(&teamID)
 
+	// Normalize / download logo URL before inserting
+	normalizedLogo := NormalizeLogoURL(teamLogoURL)
+
 	if err == sql.ErrNoRows {
 		// ถ้าไม่พบทีม ให้เพิ่มทีมใหม่
 		insertQuery := `
 			INSERT INTO teams (name_th, logo_url)
 			VALUES (?, ?)
 		`
-		result, err := db.Exec(insertQuery, teamNameThai, sql.NullString{String: teamLogoURL, Valid: teamLogoURL != ""})
+		result, err := db.Exec(insertQuery, teamNameThai, sql.NullString{String: normalizedLogo, Valid: normalizedLogo != ""})
 		if err != nil {
 			return 0, fmt.Errorf("failed to insert new team: %w", err)
 		}
@@ -42,9 +48,9 @@ func GetTeamIDByThaiName(db *sql.DB, teamNameThai, teamLogoURL string) (int, err
 		return 0, fmt.Errorf("failed to query team by name: %w", err)
 	}
        // ถ้าพบทีมแล้ว ให้อัปเดตโลโก้ เฉพาะเมื่อ teamLogoURL ไม่ว่าง
-       if teamLogoURL != "" {
-	       updateLogoQuery := "UPDATE teams SET logo_url = ? WHERE id = ?"
-	       _, err = db.Exec(updateLogoQuery, sql.NullString{String: teamLogoURL, Valid: true}, teamID)
+	   if normalizedLogo != "" {
+		   updateLogoQuery := "UPDATE teams SET logo_url = ? WHERE id = ?"
+		   _, err = db.Exec(updateLogoQuery, sql.NullString{String: normalizedLogo, Valid: true}, teamID)
 	       if err != nil {
 		       log.Printf("Warning: Failed to update team logo for ID %d: %v", teamID, err)
 	       }
@@ -60,8 +66,8 @@ func InsertOrUpdateTeam(db *sql.DB, team models.TeamDB) error {
 	query := "SELECT id FROM teams WHERE name_th = ?"
 	err := db.QueryRow(query, team.NameTH).Scan(&existingTeamID)
 
-		// รับ path local จาก team.LogoURL โดยตรง ไม่ดาวน์โหลดซ้ำ
-		logoDBPath := team.LogoURL.String
+	// Normalize / download logo path from team.LogoURL
+	logoDBPath := NormalizeLogoURL(team.LogoURL.String)
 
        if err == sql.ErrNoRows {
 	       // Insert new team
@@ -127,4 +133,73 @@ func sanitizeFileName(name string) string {
 	name = strings.ReplaceAll(name, "/", "_")
 	name = strings.ReplaceAll(name, "\\", "_")
 	return name
+}
+
+// NormalizeLogoURL will convert external logo URLs into local server paths when possible.
+// - If logo is empty, returns empty string.
+// - If logo already points to a local path (starts with /img/ or img\\), return normalized local path.
+// - If logo is an absolute external URL (http/https), attempt to download into ./img/source and
+//   return the server-local path (/img/source/<filename>). If download fails, return original URL.
+func NormalizeLogoURL(logo string) string {
+	logo = strings.TrimSpace(logo)
+	if logo == "" {
+		return ""
+	}
+
+	// Already local path
+	if strings.HasPrefix(logo, "/img/") || strings.HasPrefix(logo, "img\\") || strings.HasPrefix(logo, "img/") {
+		// Normalize backslashes
+		normalized := strings.ReplaceAll(logo, "\\", "/")
+		return normalized
+	}
+
+	// If protocol-relative URL
+	if strings.HasPrefix(logo, "//") {
+		logo = "https:" + logo
+	}
+
+	// If it's an absolute URL, try download
+	if strings.HasPrefix(logo, "http://") || strings.HasPrefix(logo, "https://") {
+		// download to ./img/source/
+		filename := filepath.Base(logo)
+		filename = sanitizeFileName(filename)
+		destDir := filepath.Join(".", "img", "source")
+		if err := os.MkdirAll(destDir, 0755); err != nil {
+			return logo
+		}
+		destPath := filepath.Join(destDir, filename)
+		// if file already exists, return server path
+		if _, err := os.Stat(destPath); err == nil {
+			return "/img/source/" + filename
+		}
+
+		// Download
+		resp, err := http.Get(logo)
+		if err != nil {
+			log.Printf("NormalizeLogoURL: download error for %s: %v", logo, err)
+			return logo
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != 200 {
+			log.Printf("NormalizeLogoURL: bad status %d for %s", resp.StatusCode, logo)
+			return logo
+		}
+
+		out, err := os.Create(destPath)
+		if err != nil {
+			log.Printf("NormalizeLogoURL: create file error %v", err)
+			return logo
+		}
+		defer out.Close()
+
+		if _, err := io.Copy(out, resp.Body); err != nil {
+			log.Printf("NormalizeLogoURL: save file error %v", err)
+			return logo
+		}
+		log.Printf("NormalizeLogoURL: downloaded logo to %s", destPath)
+		return "/img/source/" + filename
+	}
+
+	// otherwise leave as-is
+	return logo
 }

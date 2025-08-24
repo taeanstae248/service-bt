@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"go-ballthai-scraper/database"
+
 	"github.com/gorilla/mux"
 )
 
@@ -37,12 +39,18 @@ func CreateTeam(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Normalize logo URL before saving
+	normalizedLogo := ""
+	if team.LogoURL != "" {
+		normalizedLogo = database.NormalizeLogoURL(team.LogoURL)
+	}
+
 	query := `
 		INSERT INTO teams (name_th, stadium_id, team_post_ballthai, logo_url)
 		VALUES (?, ?, ?, ?)
 	`
 
-	result, err := DB.Exec(query, team.NameTh, team.StadiumID, team.TeamPostID, team.LogoURL)
+	result, err := DB.Exec(query, team.NameTh, team.StadiumID, team.TeamPostID, normalizedLogo)
 	if err != nil {
 		log.Printf("Error creating team: %v", err)
 		http.Error(w, `{"success": false, "error": "Failed to create team"}`, http.StatusInternalServerError)
@@ -86,13 +94,19 @@ func UpdateTeam(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Normalize logo URL before saving
+	normalizedLogo := team.LogoURL
+	if team.LogoURL != "" {
+		normalizedLogo = database.NormalizeLogoURL(team.LogoURL)
+	}
+
 	query := `
 		UPDATE teams 
 		SET name_th = ?, stadium_id = ?, team_post_ballthai = ?, logo_url = ?
 		WHERE id = ?
 	`
 
-	_, err = DB.Exec(query, team.NameTh, team.StadiumID, team.TeamPostID, team.LogoURL, teamID)
+	_, err = DB.Exec(query, team.NameTh, team.StadiumID, team.TeamPostID, normalizedLogo, teamID)
 	if err != nil {
 		log.Printf("Error updating team: %v", err)
 		http.Error(w, `{"success": false, "error": "Failed to update team"}`, http.StatusInternalServerError)
