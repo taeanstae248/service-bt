@@ -311,6 +311,42 @@ async function onLeagueChange() {
 async function initStandingsPage() {
     await fetchLeagues();
     document.getElementById('league_select').onchange = onLeagueChange;
+    // add a refresh button next to league_select to manually reload standings
+    try {
+        const sel = document.getElementById('league_select');
+        if (sel && sel.parentNode) {
+            let btn = document.getElementById('refreshStandingsBtn');
+            if (!btn) {
+                btn = document.createElement('button');
+                btn.id = 'refreshStandingsBtn';
+                btn.type = 'button';
+                btn.className = 'btn-secondary';
+                btn.style = 'margin-left:8px;padding:0.4rem 0.8rem;';
+                btn.innerText = '🔄 รีเฟรชตาราง';
+                sel.parentNode.insertBefore(btn, sel.nextSibling);
+            }
+            btn.onclick = refreshStandings;
+        }
+    } catch (e) {
+        console.warn('failed to attach refresh button', e);
+    }
+}
+
+// Refresh standings UI for currently selected league with a simple loading state
+async function refreshStandings() {
+    const btn = document.getElementById('refreshStandingsBtn');
+    if (!btn) return;
+    const oldText = btn.innerHTML;
+    try {
+        btn.disabled = true;
+        btn.innerHTML = '⏳ กำลังโหลด...';
+        await onLeagueChange();
+    } catch (e) {
+        console.error('refreshStandings error', e);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = oldText;
+    }
 }
 
 initStandingsPage();
