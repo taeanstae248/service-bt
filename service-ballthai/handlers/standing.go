@@ -173,16 +173,17 @@ func GetStandings(w http.ResponseWriter, r *http.Request) {
        // รองรับ league_id เป็นตัวเลข หรือ t1/t2/t3 ที่มีใน leagueNameMap เท่านั้น
        var leagueID int
        var err error
-       if _, ok := leagueNameMap[leagueIDStr]; ok {
-	       // ถ้าเป็น t1/t2/t3 ให้ map เป็นเลข
-	       switch leagueIDStr {
-	       case "t1": leagueID = 1
-	       case "t2": leagueID = 2
-	       case "t3": leagueID = 3
-	       default:
-		       http.Error(w, `{"success": false, "error": "invalid league_id"}`, http.StatusBadRequest)
-		       return
-	       }
+	   if _, ok := leagueNameMap[leagueIDStr]; ok {
+		  // ถ้าเป็น t1/t2/t3/samipro ให้ map เป็นเลข
+		  switch leagueIDStr {
+		  case "t1": leagueID = 1
+		  case "t2": leagueID = 2
+		  case "t3": leagueID = 3
+		  case "samipro": leagueID = 59
+		  default:
+			  http.Error(w, `{"success": false, "error": "invalid league_id"}`, http.StatusBadRequest)
+			  return
+		  }
        } else {
 	       leagueID, err = strconv.Atoi(leagueIDStr)
 	       if err != nil {
