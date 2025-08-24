@@ -8,9 +8,16 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"time"
 	"strings"
+	"errors"
 	"go-ballthai-scraper/database"
 	"go-ballthai-scraper/models"
+)
+
+var (
+	ErrInvalidPage = errors.New("invalid page")
+	ErrNoResults   = errors.New("no results")
 )
 
 // ensureTeamAndLogo ตรวจสอบและอัปเดตข้อมูลทีมและโลโก้ในตาราง teams
@@ -63,108 +70,184 @@ func ensureTeamAndLogo(db *sql.DB, teamName string) error {
 
 // scrapeMatchesByConfig เป็นฟังก์ชันทั่วไปสำหรับจัดการการกำหนดค่าการ scrape แมตช์ต่างๆ
 func scrapeMatchesByConfig(db *sql.DB, baseURL string, pages []int, tournamentParam string, leagueType string, dbLeagueID int) error {
-	for _, page := range pages {
-		url := fmt.Sprintf("%s%d%s", baseURL, page, tournamentParam)
-		log.Printf("Scraping matches for %s, page %d: %s", leagueType, page, url)
-
-		var apiResponse struct {
-			Results []models.MatchAPI `json:"results"`
+	// If pages provided explicitly, use them
+	if len(pages) > 0 {
+		for _, p := range pages {
+			if err := scrapeMatchesPage(db, baseURL, p, tournamentParam, leagueType, dbLeagueID); err != nil {
+				log.Printf("Error scraping page %d for %s: %v", p, leagueType, err)
+			}
 		}
-		err := FetchAndParseAPI(url, &apiResponse)
+		return nil
+	}
+
+	// Auto-pagination: iterate pages until an empty result set or a safety maxPages
+	maxPages := 200
+	for page := 1; page <= maxPages; page++ {
+		err := scrapeMatchesPage(db, baseURL, page, tournamentParam, leagueType, dbLeagueID)
+		if err == ErrInvalidPage {
+			log.Printf("API reports invalid page %d for %s, stopping pagination", page, leagueType)
+			break
+		}
+		if err == ErrNoResults {
+			log.Printf("No results on page %d for %s, stopping pagination", page, leagueType)
+			break
+		}
 		if err != nil {
-			log.Printf("Error fetching matches from %s: %v", url, err)
-			continue // ดำเนินการไปยังหน้าถัดไปแม้ว่าหน้าปัจจุบันจะล้มเหลว
+			log.Printf("Error scraping page %d for %s: %v", page, leagueType, err)
+			time.Sleep(200 * time.Millisecond)
+			continue
+		}
+		// be polite
+		time.Sleep(100 * time.Millisecond)
+	}
+	return nil
+}
+
+
+// scrapeMatchesPage processes a single page of matches
+func scrapeMatchesPage(db *sql.DB, baseURL string, page int, tournamentParam string, leagueType string, dbLeagueID int) error {
+	url := fmt.Sprintf("%s%d%s", baseURL, page, tournamentParam)
+	log.Printf("Scraping matches for %s, page %d: %s", leagueType, page, url)
+
+	var apiResponse struct {
+		Results []models.MatchAPI `json:"results"`
+	}
+	if err := FetchAndParseAPI(url, &apiResponse); err != nil {
+		// check for invalid page message from API
+		if strings.Contains(err.Error(), "Invalid page") || strings.Contains(err.Error(), "404") {
+			return ErrInvalidPage
+		}
+		return fmt.Errorf("Error fetching matches from %s: %w", url, err)
+	}
+
+	if len(apiResponse.Results) == 0 {
+		log.Printf("No results on page %d for %s", page, leagueType)
+		return ErrNoResults
+	}
+
+	for _, apiMatch := range apiResponse.Results {
+		var stageID int
+		if apiMatch.StageName != "" {
+			sid, errStage := database.GetStageID(db, apiMatch.StageName, dbLeagueID)
+			if errStage != nil {
+				log.Printf("Warning: Failed to insert/update stage for match %d (%s): %v", apiMatch.ID, apiMatch.StageName, errStage)
+			} else {
+				stageID = sid
+			}
 		}
 
-		for _, apiMatch := range apiResponse.Results {
-			// --- ดึง stage_id จากชื่อ stage_name แล้วนำไปเก็บใน matches (ไม่ต้องดึง/insert league แล้ว) ---
-			if apiMatch.StageName != "" {
-				_, err = database.GetStageID(db, apiMatch.StageName, dbLeagueID)
+		var currentStatus string
+		err := db.QueryRow("SELECT match_status FROM matches WHERE match_ref_id = ?", apiMatch.ID).Scan(&currentStatus)
+		if err == nil && currentStatus == "OFF" {
+			log.Printf("Skip update match %d (status=OFF)", apiMatch.ID)
+			continue
+		}
+
+		var homeTeamID, awayTeamID int
+		if apiMatch.HomeTeamName != "" {
+			id, err := database.GetTeamIDByThaiName(db, apiMatch.HomeTeamName, "")
+			if err != nil {
+				log.Printf("Warning: GetTeamIDByThaiName home team '%s' failed: %v", apiMatch.HomeTeamName, err)
+			} else {
+				homeTeamID = id
+			}
+		}
+		if apiMatch.AwayTeamName != "" {
+			id, err := database.GetTeamIDByThaiName(db, apiMatch.AwayTeamName, "")
+			if err != nil {
+				log.Printf("Warning: GetTeamIDByThaiName away team '%s' failed: %v", apiMatch.AwayTeamName, err)
+			} else {
+				awayTeamID = id
+			}
+		}
+
+		channelLogoPath := ""
+		if apiMatch.ChannelInfo.Name != "" && apiMatch.ChannelInfo.Logo != "" {
+			ext := path.Ext(apiMatch.ChannelInfo.Logo)
+			if ext == "" {
+				ext = ".png"
+			}
+			safeName := sanitizeFileName(apiMatch.ChannelInfo.Name)
+			fileName := safeName + ext
+			localPath := path.Join("img/channels", fileName)
+			webPath := "/img/channels/" + fileName
+			if _, err := os.Stat(localPath); os.IsNotExist(err) {
+				err := downloadChannelLogoToFolder(apiMatch.ChannelInfo.Logo, safeName)
 				if err != nil {
-					log.Printf("Warning: Failed to insert/update stage for match %d (%s): %v", apiMatch.ID, apiMatch.StageName, err)
+					log.Printf("Warning: Failed to download channel logo for %s: %v", apiMatch.ChannelInfo.Name, err)
+					webPath = apiMatch.ChannelInfo.Logo
 				}
 			}
-
-			// เช็ค match_status ใน DB ถ้าเป็น OFF ให้ข้ามการอัปเดต
-			var currentStatus string
-			err := db.QueryRow("SELECT match_status FROM matches WHERE match_ref_id = ?", apiMatch.ID).Scan(&currentStatus)
-			if err == nil && currentStatus == "OFF" {
-				log.Printf("Skip update match %d (status=OFF)", apiMatch.ID)
-				continue
+			channelLogoPath = webPath
+		} else if apiMatch.ChannelInfo.Name != "" {
+			channelLogoPath = ""
+		}
+		if apiMatch.ChannelInfo.Name != "" {
+			_, err := database.GetChannelID(db, apiMatch.ChannelInfo.Name, channelLogoPath, "TV")
+			if err != nil {
+				log.Printf("Warning: Failed to get channel ID for match %d (%s): %v", apiMatch.ID, apiMatch.ChannelInfo.Name, err)
 			}
+		}
 
-			// ไม่ต้องดาวน์โหลดโลโก้ซ้ำที่นี่ เพราะ InsertOrUpdateTeam จะจัดการให้แล้ว
-
-			   // รับ Home Team ID
-			if apiMatch.HomeTeamName != "" {
-				_, _ = database.GetTeamIDByThaiName(db, apiMatch.HomeTeamName, "")
+		liveChannelLogoPath := ""
+		if apiMatch.LiveInfo.Name != "" && apiMatch.LiveInfo.Logo != "" {
+			ext := path.Ext(apiMatch.LiveInfo.Logo)
+			if ext == "" {
+				ext = ".png"
 			}
-			if apiMatch.AwayTeamName != "" {
-				_, _ = database.GetTeamIDByThaiName(db, apiMatch.AwayTeamName, "")
-			}
-
-			// รับ Channel ID (Main TV) - ดาวน์โหลดโลโก้ลง server ถ้ายังไม่มี
-			// channelID := sql.NullInt64{Valid: false}
-			channelLogoPath := ""
-			if apiMatch.ChannelInfo.Name != "" && apiMatch.ChannelInfo.Logo != "" {
-				ext := path.Ext(apiMatch.ChannelInfo.Logo)
-				if ext == "" {
-					ext = ".png"
-				}
-				safeName := sanitizeFileName(apiMatch.ChannelInfo.Name)
-				fileName := safeName + ext
-				localPath := path.Join("img/channels", fileName)
-				webPath := "/img/channels/" + fileName
-				// ถ้ายังไม่มีไฟล์ ให้ดาวน์โหลด
-				if _, err := os.Stat(localPath); os.IsNotExist(err) {
-					err := downloadChannelLogoToFolder(apiMatch.ChannelInfo.Logo, safeName)
-					if err != nil {
-						log.Printf("Warning: Failed to download channel logo for %s: %v", apiMatch.ChannelInfo.Name, err)
-						webPath = apiMatch.ChannelInfo.Logo // fallback เป็น url เดิม
-					}
-				}
-				channelLogoPath = webPath
-			} else if apiMatch.ChannelInfo.Name != "" {
-				channelLogoPath = ""
-			}
-			// var channelID sql.NullInt64 = sql.NullInt64{Valid: false}
-			if apiMatch.ChannelInfo.Name != "" {
-				_, err := database.GetChannelID(db, apiMatch.ChannelInfo.Name, channelLogoPath, "TV")
+			safeName := sanitizeFileName(apiMatch.LiveInfo.Name)
+			fileName := safeName + ext
+			localPath := path.Join("img/channels", fileName)
+			webPath := "/img/channels/" + fileName
+			if _, err := os.Stat(localPath); os.IsNotExist(err) {
+				err := downloadChannelLogoToFolder(apiMatch.LiveInfo.Logo, safeName)
 				if err != nil {
-					log.Printf("Warning: Failed to get channel ID for match %d (%s): %v", apiMatch.ID, apiMatch.ChannelInfo.Name, err)
+					log.Printf("Warning: Failed to download live channel logo for %s: %v", apiMatch.LiveInfo.Name, err)
+					webPath = apiMatch.LiveInfo.Logo
 				}
 			}
+			liveChannelLogoPath = webPath
+		} else if apiMatch.LiveInfo.Name != "" {
+			liveChannelLogoPath = ""
+		}
+		if apiMatch.LiveInfo.Name != "" {
+			_, err := database.GetChannelID(db, apiMatch.LiveInfo.Name, liveChannelLogoPath, "Live Stream")
+			if err != nil {
+				log.Printf("Warning: Failed to get live channel ID for match %d (%s): %v", apiMatch.ID, apiMatch.LiveInfo.Name, err)
+			}
+		}
 
-			// รับ Live Channel ID - ดาวน์โหลดโลโก้ลง server ถ้ายังไม่มี
-			// liveChannelID := sql.NullInt64{Valid: false}
-			liveChannelLogoPath := ""
-			if apiMatch.LiveInfo.Name != "" && apiMatch.LiveInfo.Logo != "" {
-				ext := path.Ext(apiMatch.LiveInfo.Logo)
-				if ext == "" {
-					ext = ".png"
-				}
-				safeName := sanitizeFileName(apiMatch.LiveInfo.Name)
-				fileName := safeName + ext
-				localPath := path.Join("img/channels", fileName)
-				webPath := "/img/channels/" + fileName
-				if _, err := os.Stat(localPath); os.IsNotExist(err) {
-					err := downloadChannelLogoToFolder(apiMatch.LiveInfo.Logo, safeName)
-					if err != nil {
-						log.Printf("Warning: Failed to download live channel logo for %s: %v", apiMatch.LiveInfo.Name, err)
-						webPath = apiMatch.LiveInfo.Logo
-					}
-				}
-				liveChannelLogoPath = webPath
-			} else if apiMatch.LiveInfo.Name != "" {
-				liveChannelLogoPath = ""
+		log.Printf("Processing match %d: leagueID=%d stageID=%d home='%s' away='%s'", apiMatch.ID, dbLeagueID, stageID, apiMatch.HomeTeamName, apiMatch.AwayTeamName)
+		matchDB := models.MatchDB{
+			MatchRefID: apiMatch.ID,
+			StartDate:  apiMatch.StartDate,
+			StartTime:  apiMatch.StartTime,
+			LeagueID:   sql.NullInt64{Valid: dbLeagueID != 0, Int64: int64(dbLeagueID)},
+			StageID:    sql.NullInt64{Valid: stageID != 0, Int64: int64(stageID)},
+			HomeTeamID: sql.NullInt64{Valid: homeTeamID != 0, Int64: int64(homeTeamID)},
+			AwayTeamID: sql.NullInt64{Valid: awayTeamID != 0, Int64: int64(awayTeamID)},
+			ChannelID:  sql.NullInt64{Valid: false},
+			LiveChannelID: sql.NullInt64{Valid: false},
+			HomeScore:   sql.NullInt64{Valid: true, Int64: int64(apiMatch.HomeGoalCount)},
+			AwayScore:   sql.NullInt64{Valid: true, Int64: int64(apiMatch.AwayGoalCount)},
+			MatchStatus: sql.NullString{String: fmt.Sprint(apiMatch.MatchStatus), Valid: apiMatch.MatchStatus != nil},
+		}
+
+		if apiMatch.ChannelInfo.Name != "" {
+			if chID, err := database.GetChannelID(db, apiMatch.ChannelInfo.Name, channelLogoPath, "TV"); err == nil {
+				matchDB.ChannelID = sql.NullInt64{Valid: true, Int64: int64(chID)}
 			}
-			// var liveChannelID sql.NullInt64 = sql.NullInt64{Valid: false}
-			if apiMatch.LiveInfo.Name != "" {
-				_, err := database.GetChannelID(db, apiMatch.LiveInfo.Name, liveChannelLogoPath, "Live Stream")
-				if err != nil {
-					log.Printf("Warning: Failed to get live channel ID for match %d (%s): %v", apiMatch.ID, apiMatch.LiveInfo.Name, err)
-				}
+		}
+		if apiMatch.LiveInfo.Name != "" {
+			if lchID, err := database.GetChannelID(db, apiMatch.LiveInfo.Name, liveChannelLogoPath, "Live Stream"); err == nil {
+				matchDB.LiveChannelID = sql.NullInt64{Valid: true, Int64: int64(lchID)}
 			}
+		}
+
+		if err := database.InsertOrUpdateMatch(db, matchDB); err != nil {
+			log.Printf("Error saving match %d: %v", apiMatch.ID, err)
+		} else {
+			log.Printf("Saved match %d to DB", apiMatch.ID)
 		}
 	}
 	return nil
@@ -206,8 +289,9 @@ func sanitizeFileName(name string) string {
 }
 
 func ScrapeThaileagueMatches(db *sql.DB, targetLeague string) error { // เพิ่ม targetLeague parameter
-	   baseURL := "https://competition.tl.prod.c0d1um.io/thaileague/api/match-day-match-public/?page="
-	   singlePage := []int{1}
+		baseURL := "https://competition.tl.prod.c0d1um.io/thaileague/api/match-day-match-public/?page="
+		// pass nil pages to enable auto-pagination (iterate until no more results)
+		var singlePage []int = nil
 
 	   // ดึงลีกทั้งหมดจาก DB
 	   leagues, err := database.GetAllLeagues(db)
@@ -226,7 +310,7 @@ func ScrapeThaileagueMatches(db *sql.DB, targetLeague string) error { // เพ�
 		   }
 		   tournamentParam := fmt.Sprintf("&tournament=%d", league.ThaileageID)
 		   log.Printf("Scraping league: %s (thaileageid=%d)", league.Name, league.ThaileageID)
-		   if err := scrapeMatchesByConfig(db, baseURL, singlePage, tournamentParam, league.Name, league.ID); err != nil {
+		  if err := scrapeMatchesByConfig(db, baseURL, singlePage, tournamentParam, league.Name, league.ID); err != nil {
 			   log.Printf("Error scraping %s: %v", league.Name, err)
 		   }
 	   }

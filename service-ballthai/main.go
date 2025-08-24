@@ -1,7 +1,9 @@
 // ...existing code...
 package main
 
+import (
 	"database/sql"
+	"go-ballthai-scraper/database"
 	"go-ballthai-scraper/handlers"
 	"go-ballthai-scraper/scraper"
 	"log"
