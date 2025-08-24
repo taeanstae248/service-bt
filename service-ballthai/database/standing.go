@@ -141,7 +141,7 @@ func join(parts []string, sep string) string {
 
 // GetStandingsByLeagueID คืน standings ทั้งหมดของลีกที่ระบุ
 func GetStandingsByLeagueID(db *sql.DB, leagueID int) ([]models.StandingDB, error) {
-		rows, err := db.Query(`SELECT s.id, s.league_id, s.team_id, t.name_th as team_name, s.stage_id, s.status, s.matches_played, s.wins, s.draws, s.losses, s.goals_for, s.goals_against, s.goal_difference, s.points, s.current_rank FROM standings s LEFT JOIN teams t ON s.team_id = t.id WHERE s.league_id = ? ORDER BY s.current_rank ASC, s.id ASC`, leagueID)
+		rows, err := db.Query(`SELECT s.id, s.league_id, s.team_id, t.name_th as team_name, t.logo_url as team_logo, s.stage_id, s.status, s.matches_played, s.wins, s.draws, s.losses, s.goals_for, s.goals_against, s.goal_difference, s.points, s.current_rank FROM standings s LEFT JOIN teams t ON s.team_id = t.id WHERE s.league_id = ? ORDER BY s.current_rank ASC, s.id ASC`, leagueID)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +149,7 @@ func GetStandingsByLeagueID(db *sql.DB, leagueID int) ([]models.StandingDB, erro
 	var standings []models.StandingDB
 	for rows.Next() {
 		var s models.StandingDB
-		if err := rows.Scan(&s.ID, &s.LeagueID, &s.TeamID, &s.TeamName, &s.StageID, &s.Status, &s.MatchesPlayed, &s.Wins, &s.Draws, &s.Losses, &s.GoalsFor, &s.GoalsAgainst, &s.GoalDifference, &s.Points, &s.CurrentRank); err != nil {
+		if err := rows.Scan(&s.ID, &s.LeagueID, &s.TeamID, &s.TeamName, &s.TeamLogo, &s.StageID, &s.Status, &s.MatchesPlayed, &s.Wins, &s.Draws, &s.Losses, &s.GoalsFor, &s.GoalsAgainst, &s.GoalDifference, &s.Points, &s.CurrentRank); err != nil {
 			return nil, err
 		}
 		standings = append(standings, s)
