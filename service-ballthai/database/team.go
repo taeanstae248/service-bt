@@ -138,8 +138,8 @@ func sanitizeFileName(name string) string {
 // NormalizeLogoURL will convert external logo URLs into local server paths when possible.
 // - If logo is empty, returns empty string.
 // - If logo already points to a local path (starts with /img/ or img\\), return normalized local path.
-// - If logo is an absolute external URL (http/https), attempt to download into ./img/source and
-//   return the server-local path (/img/source/<filename>). If download fails, return original URL.
+// - If logo is an absolute external URL (http/https), attempt to download into ./img/teams and
+//   return the server-local path (/img/teams/<filename>). If download fails, return original URL.
 func NormalizeLogoURL(logo string) string {
 	logo = strings.TrimSpace(logo)
 	if logo == "" {
@@ -160,17 +160,17 @@ func NormalizeLogoURL(logo string) string {
 
 	// If it's an absolute URL, try download
 	if strings.HasPrefix(logo, "http://") || strings.HasPrefix(logo, "https://") {
-		// download to ./img/source/
-		filename := filepath.Base(logo)
+		// download to ./img/teams/
+			filename := filepath.Base(logo)
 		filename = sanitizeFileName(filename)
-		destDir := filepath.Join(".", "img", "source")
+			destDir := filepath.Join(".", "img", "teams")
 		if err := os.MkdirAll(destDir, 0755); err != nil {
 			return logo
 		}
 		destPath := filepath.Join(destDir, filename)
 		// if file already exists, return server path
 		if _, err := os.Stat(destPath); err == nil {
-			return "/img/source/" + filename
+				return "/img/teams/" + filename
 		}
 
 		// Download
@@ -196,8 +196,8 @@ func NormalizeLogoURL(logo string) string {
 			log.Printf("NormalizeLogoURL: save file error %v", err)
 			return logo
 		}
-		log.Printf("NormalizeLogoURL: downloaded logo to %s", destPath)
-		return "/img/source/" + filename
+	log.Printf("NormalizeLogoURL: downloaded logo to %s", destPath)
+	return "/img/teams/" + filename
 	}
 
 	// otherwise leave as-is

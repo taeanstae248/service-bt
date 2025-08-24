@@ -198,10 +198,10 @@ func downloadTeamLogo(logoURL string) string {
 		logoURL = "https:" + logoURL
 	}
 
-	// Create logo path
+	// Create logo path into img/teams
 	filename := filepath.Base(logoURL)
-	logoPath := "/img/source/" + filename
-	fullPath := filepath.Join(".", "img", "source", filename)
+	logoPath := "/img/teams/" + filename
+	fullPath := filepath.Join(".", "img", "teams", filename)
 
 	// Create directory if it doesn't exist
 	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {

@@ -270,13 +270,9 @@ func main() {
 	// Serve channel images from /img/channels/ -> ./img/channels/
 	router.PathPrefix("/img/channels/").Handler(http.StripPrefix("/img/channels/", http.FileServer(http.Dir("img/channels/"))))
 
-	// Serve downloaded source images from /img/source/ -> ./img/source/
-	router.PathPrefix("/img/source/").Handler(http.StripPrefix("/img/source/", http.FileServer(http.Dir("img/source/"))))
-
 	// Ensure image directories exist to avoid 404s when files are created at runtime
 	os.MkdirAll("img/teams", 0755)
 	os.MkdirAll("img/channels", 0755)
-	os.MkdirAll("img/source", 0755)
 
 	// Redirect root to login
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
