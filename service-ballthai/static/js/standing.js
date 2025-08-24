@@ -68,7 +68,7 @@ async function renderStandingsTableWithStage(standings) {
     }
     let html = `<table class="standings-table" border="1" cellpadding="4" style="width:100%;margin-top:1rem;">
         <thead><tr>
-            <th>ลำดับ</th><th>ทีม</th><th>แข่ง</th><th>ชนะ</th><th>เสมอ</th><th>แพ้</th><th>ได้</th><th>เสีย</th><th>ผลต่าง</th><th>แต้ม</th><th>เลื่อน</th><th>จัดการ</th>
+            <th>ลำดับ</th><th>ทีม</th><th>แข่ง</th><th>ชนะ</th><th>เสมอ</th><th>แพ้</th><th>ได้</th><th>เสีย</th><th>ผลต่าง</th><th>แต้ม</th><th>เลื่อน</th><th>สถานะ</th><th>จัดการ</th>
         </tr></thead><tbody>`;
     filtered.sort((a, b) => {
         // รองรับ current_rank ทั้ง Int64, int, null, undefined
@@ -81,6 +81,17 @@ async function renderStandingsTableWithStage(standings) {
         return ra - rb;
     });
     filtered.forEach((s,i) => {
+        // determine status value robustly: support sql.NullInt64 object, number or string
+        let st = null;
+        if (s && s.status !== undefined && s.status !== null) {
+            if (typeof s.status === 'object' && s.status.Int64 !== undefined) {
+                st = Number(s.status.Int64);
+            } else {
+                st = Number(s.status);
+            }
+            if (Number.isNaN(st)) st = null;
+        }
+        const stText = (st === 1) ? 'OFF - ปิดการดึง' : 'ON - เปิดการดึง';
         html += `<tr data-id="${s.id}" data-rank="${s.current_rank?.Int64||i+1}">
             <td>${s.current_rank?.Int64||i+1}</td>
             <td>${(s.team_name && typeof s.team_name === 'string') ? s.team_name : '-'}</td>
@@ -96,6 +107,7 @@ async function renderStandingsTableWithStage(standings) {
                 <button class="move-btn" onclick="moveRow(this, -1)" ${i===0?'disabled':''}>⬆️</button>
                 <button class="move-btn" onclick="moveRow(this, 1)" ${i===filtered.length-1?'disabled':''}>⬇️</button>
             </td>
+            <td id="status-cell-${s.id}">${stText} <button onclick="toggleStandingStatus(${s.id}, ${st === null ? 'null' : st})" style="margin-left:6px">🔁</button></td>
             <td><button onclick="editStanding(${s.id})">✏️</button></td>
         </tr>`;
     });
@@ -151,6 +163,10 @@ function showEditStandingModal(standing) {
     const modal = document.createElement('div');
     modal.id = 'editStandingModal';
     modal.style = 'position:fixed;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.3);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    // compute selected status as number (support object/string/number)
+    const selectedStatus = (standing && standing.status !== undefined && standing.status !== null)
+        ? (typeof standing.status === 'object' && standing.status.Int64 !== undefined ? Number(standing.status.Int64) : Number(standing.status))
+        : 0;
     modal.innerHTML = `
     <div style="background:#fff;padding:2rem 2.5rem;border-radius:12px;min-width:320px;max-width:95vw;box-shadow:0 2px 16px #0002;position:relative;">
         <h2 style="margin-top:0;margin-bottom:1.5rem;font-size:1.3rem;color:#667eea;">แก้ไขข้อมูลทีม: <span style='color:#222'>${standing.team_name||'-'}</span></h2>
@@ -166,8 +182,8 @@ function showEditStandingModal(standing) {
             <label>อันดับ: <input type="number" name="current_rank" value="${standing.current_rank?.Int64||1}" min="1" required></label><br><br>
             <label>สถานะ: 
                 <select name="status" required>
-                    <option value="1" ${standing.status?.Int64==1?'selected':''}>ON - เปิดการดึง</option>
-                    <option value="0" ${standing.status?.Int64==0?'selected':''}>OFF - ปิดการดึง</option>
+                    <option value="0" ${selectedStatus==0?'selected':''}>ON - เปิดการดึง</option>
+                    <option value="1" ${selectedStatus==1?'selected':''}>OFF - ปิดการดึง</option>
                 </select>
             </label><br><br>
             <div style="text-align:right">
@@ -177,6 +193,16 @@ function showEditStandingModal(standing) {
         </form>
     </div>`;
     document.body.appendChild(modal);
+    // ensure select reflects computed selectedStatus (force-set to avoid template/caching mismatch)
+    try {
+        const selElem = modal.querySelector('select[name="status"]');
+        if (selElem) {
+            selElem.value = String(selectedStatus === undefined || Number.isNaN(Number(selectedStatus)) ? 0 : selectedStatus);
+            console.log('[DEBUG] showEditStandingModal selectedStatus ->', selElem.value);
+        }
+    } catch (e) {
+        console.warn('[DEBUG] failed to force-set status select', e);
+    }
     document.getElementById('cancelEditStanding').onclick = () => modal.remove();
     document.getElementById('editStandingForm').onsubmit = async function(e) {
         e.preventDefault();
@@ -223,6 +249,38 @@ function editStanding(id) {
         return;
     }
     showEditStandingModal(standing);
+}
+
+// status toggling removed from UI
+// toggle status (0 <-> 1) for a standing row by id
+async function toggleStandingStatus(id, currentStatus) {
+    // currentStatus may be null (treat as 0)
+    const cur = (currentStatus === null || currentStatus === undefined) ? 0 : currentStatus;
+    const newStatus = cur === 1 ? 0 : 1;
+    try {
+        const res = await fetch(`/api/standings/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: newStatus })
+        });
+        const data = await res.json();
+        if (data && data.success) {
+            // update cell text
+            const cell = document.getElementById(`status-cell-${id}`);
+            if (cell) cell.innerHTML = (newStatus===1? 'OFF - ปิดการดึง' : 'ON - เปิดการดึง') + ` <button onclick="toggleStandingStatus(${id}, ${newStatus})" style="margin-left:6px">🔁</button>`;
+            // update window._debugStandings if present
+            if (window._debugStandings && Array.isArray(window._debugStandings)) {
+                const s = window._debugStandings.find(x => x.id == id);
+                if (s) {
+                    s.status = { Int64: newStatus };
+                }
+            }
+        } else {
+            alert('ไม่สามารถเปลี่ยนสถานะ: ' + (data && data.error ? data.error : JSON.stringify(data)));
+        }
+    } catch (err) {
+        alert('เกิดข้อผิดพลาดขณะเปลี่ยนสถานะ: ' + err);
+    }
 }
 
 // เมื่อเลือกลีก ให้โหลด standings ของลีกนั้น

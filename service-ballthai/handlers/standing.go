@@ -71,28 +71,20 @@ func UpdateStanding(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Map json -> StandingDB (handle sql.NullInt64)
-	standing := models.StandingDB{ID: id}
-	if v, ok := req["matches_played"]; ok { standing.MatchesPlayed, _ = toInt(v) }
-	if v, ok := req["wins"]; ok { standing.Wins, _ = toInt(v) }
-	if v, ok := req["draws"]; ok { standing.Draws, _ = toInt(v) }
-	if v, ok := req["losses"]; ok { standing.Losses, _ = toInt(v) }
-	if v, ok := req["goals_for"]; ok { standing.GoalsFor, _ = toInt(v) }
-	if v, ok := req["goals_against"]; ok { standing.GoalsAgainst, _ = toInt(v) }
-	if v, ok := req["goal_difference"]; ok { standing.GoalDifference, _ = toInt(v) }
-	if v, ok := req["points"]; ok { standing.Points, _ = toInt(v) }
-	if v, ok := req["current_rank"]; ok {
-		i, _ := toInt64(v)
-		standing.CurrentRank = sqlNullInt64(i)
-	}
-		if v, ok := req["status"]; ok { 
-			i, _ := toInt64(v) 
-			standing.Status = sqlNullInt64(i) 
-		} else { 
-			standing.Status = sqlNullInt64(0) // default OFF 
-		}
+	// Build a map of fields provided by caller to avoid overwriting unspecified fields with zeros
+	fields := make(map[string]interface{})
+	if v, ok := req["matches_played"]; ok { if i, ok2 := toInt(v); ok2 { fields["matches_played"] = i } }
+	if v, ok := req["wins"]; ok { if i, ok2 := toInt(v); ok2 { fields["wins"] = i } }
+	if v, ok := req["draws"]; ok { if i, ok2 := toInt(v); ok2 { fields["draws"] = i } }
+	if v, ok := req["losses"]; ok { if i, ok2 := toInt(v); ok2 { fields["losses"] = i } }
+	if v, ok := req["goals_for"]; ok { if i, ok2 := toInt(v); ok2 { fields["goals_for"] = i } }
+	if v, ok := req["goals_against"]; ok { if i, ok2 := toInt(v); ok2 { fields["goals_against"] = i } }
+	if v, ok := req["goal_difference"]; ok { if i, ok2 := toInt(v); ok2 { fields["goal_difference"] = i } }
+	if v, ok := req["points"]; ok { if i, ok2 := toInt(v); ok2 { fields["points"] = i } }
+	if v, ok := req["current_rank"]; ok { if i, ok2 := toInt64(v); ok2 { fields["current_rank"] = i } }
+	if v, ok := req["status"]; ok { if i, ok2 := toInt64(v); ok2 { fields["status"] = i } }
 
-	err = database.UpdateStandingByID(database.DB, id, standing)
+	err = database.UpdateStandingFieldsByID(database.DB, id, fields)
 	if err != nil {
 		println("[ERROR] UpdateStandingByID:", err.Error())
 		http.Error(w, `{"success": false, "error": "failed to update standing"}`, http.StatusInternalServerError)
@@ -102,7 +94,6 @@ func UpdateStanding(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"id":      id,
-		"data":    standing,
 	})
 }
 
@@ -234,20 +225,21 @@ func GetStandings(w http.ResponseWriter, r *http.Request) {
        }
        // เพิ่ม stage_name ให้แต่ละ standing ถ้ามี stage_id
        type standingAPI struct {
-	       ID             int     `json:"id"`
-	       LeagueID       int     `json:"league_id"`
-	       TeamID         int     `json:"team_id"`
-	       TeamName       *string `json:"team_name"`
-	       MatchesPlayed  int     `json:"matches_played"`
-	       Wins           int     `json:"wins"`
-	       Draws          int     `json:"draws"`
-	       Losses         int     `json:"losses"`
-	       GoalsFor       int     `json:"goals_for"`
-	       GoalsAgainst   int     `json:"goals_against"`
-	       GoalDifference int     `json:"goal_difference"`
-	       Points         int     `json:"points"`
-	       CurrentRank    int     `json:"current_rank"`
-	       StageName      string  `json:"stage_name"`
+	       ID             int             `json:"id"`
+	       LeagueID       int             `json:"league_id"`
+	       TeamID         int             `json:"team_id"`
+	       TeamName       *string         `json:"team_name"`
+	       MatchesPlayed  int             `json:"matches_played"`
+	       Wins           int             `json:"wins"`
+	       Draws          int             `json:"draws"`
+	       Losses         int             `json:"losses"`
+	       GoalsFor       int             `json:"goals_for"`
+	       GoalsAgainst   int             `json:"goals_against"`
+	       GoalDifference int             `json:"goal_difference"`
+	       Points         int             `json:"points"`
+	       CurrentRank    int             `json:"current_rank"`
+	       StageName      string          `json:"stage_name"`
+	       Status         sql.NullInt64   `json:"status"`
        }
        var result []standingAPI
        for _, s := range standings {
@@ -290,6 +282,7 @@ func GetStandings(w http.ResponseWriter, r *http.Request) {
 		       Points:         s.Points,
 		       CurrentRank:    currentRank,
 		       StageName:      stageName,
+				   Status:         s.Status,
 	       })
        }
        json.NewEncoder(w).Encode(map[string]interface{}{

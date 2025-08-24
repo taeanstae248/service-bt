@@ -27,8 +27,9 @@ func GetStandingStatus(db *sql.DB, leagueID, teamID int, stageID sql.NullInt64) 
 
 // UpdateStandingRankByID อัปเดต current_rank ของ standing ตาม id
 func UpdateStandingRankByID(db *sql.DB, id int, currentRank int) error {
-	// update current_rank เฉพาะ status != 0 (ON) โดย WHERE แค่ id
-	q := `UPDATE standings SET current_rank=? WHERE id=? AND (status IS NULL OR status != 0)`
+	// update current_rank เฉพาะ status != 1 (ON) โดย WHERE แค่ id
+	// New semantics: status==1 means OFF (do not pull/update)
+	q := `UPDATE standings SET current_rank=? WHERE id=? AND (status IS NULL OR status != 1)`
 	res, err := db.Exec(q, sql.NullInt64{Int64: int64(currentRank), Valid: true}, id)
 	if err != nil {
 		log.Printf("[UpdateStandingRankByID] ERROR: id=%d, currentRank=%d, err=%v", id, currentRank, err)
@@ -44,18 +45,98 @@ func UpdateStandingRankByID(db *sql.DB, id int, currentRank int) error {
 }
 
 func UpdateStandingByID(db *sql.DB, id int, standing models.StandingDB) error {
+   // If status.Valid is true, include status in UPDATE. Otherwise leave status unchanged.
+   if standing.Status.Valid {
+	   updateQuery := `
+		   UPDATE standings SET
+			   status = ?, matches_played = ?, wins = ?, draws = ?, losses = ?,
+			   goals_for = ?, goals_against = ?, goal_difference = ?, points = ?, current_rank = ?
+		   WHERE id = ?
+	   `
+	   _, err := db.Exec(updateQuery,
+		   standing.Status, standing.MatchesPlayed, standing.Wins, standing.Draws, standing.Losses,
+		   standing.GoalsFor, standing.GoalsAgainst, standing.GoalDifference, standing.Points, standing.CurrentRank,
+		   id,
+	   )
+	   return err
+   }
+   // status not provided: update other fields only
    updateQuery := `
 	   UPDATE standings SET
-		   status = ?, matches_played = ?, wins = ?, draws = ?, losses = ?,
+		   matches_played = ?, wins = ?, draws = ?, losses = ?,
 		   goals_for = ?, goals_against = ?, goal_difference = ?, points = ?, current_rank = ?
 	   WHERE id = ?
    `
    _, err := db.Exec(updateQuery,
-	   standing.Status, standing.MatchesPlayed, standing.Wins, standing.Draws, standing.Losses,
+	   standing.MatchesPlayed, standing.Wins, standing.Draws, standing.Losses,
 	   standing.GoalsFor, standing.GoalsAgainst, standing.GoalDifference, standing.Points, standing.CurrentRank,
 	   id,
    )
    return err
+}
+
+// UpdateStandingFieldsByID updates only the provided fields for a standing (partial update)
+func UpdateStandingFieldsByID(db *sql.DB, id int, fields map[string]interface{}) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	// allowed columns and their parameter placeholder order
+	allowed := map[string]bool{
+		"matches_played": true, "wins": true, "draws": true, "losses": true,
+		"goals_for": true, "goals_against": true, "goal_difference": true, "points": true,
+		"current_rank": true, "status": true,
+	}
+	cols := []string{}
+	args := []interface{}{}
+	for k, v := range fields {
+		if !allowed[k] {
+			continue
+		}
+		cols = append(cols, fmt.Sprintf("%s = ?", k))
+		// for current_rank and status we expect int64 in map
+		if k == "current_rank" {
+			switch val := v.(type) {
+			case int64:
+				args = append(args, sql.NullInt64{Int64: val, Valid: true})
+			case int:
+				args = append(args, sql.NullInt64{Int64: int64(val), Valid: true})
+			default:
+				args = append(args, v)
+			}
+			continue
+		}
+		if k == "status" {
+			switch val := v.(type) {
+			case int64:
+				args = append(args, sql.NullInt64{Int64: val, Valid: true})
+			case int:
+				args = append(args, sql.NullInt64{Int64: int64(val), Valid: true})
+			default:
+				args = append(args, v)
+			}
+			continue
+		}
+		args = append(args, v)
+	}
+	if len(cols) == 0 {
+		return nil
+	}
+	query := fmt.Sprintf("UPDATE standings SET %s WHERE id = ?", join(cols, ", "))
+	args = append(args, id)
+	_, err := db.Exec(query, args...)
+	return err
+}
+
+// simple join helper (avoid importing strings to keep patch minimal)
+func join(parts []string, sep string) string {
+	out := ""
+	for i, p := range parts {
+		if i > 0 {
+			out += sep
+		}
+		out += p
+	}
+	return out
 }
 
 // GetStandingsByLeagueID คืน standings ทั้งหมดของลีกที่ระบุ

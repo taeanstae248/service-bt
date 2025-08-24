@@ -86,10 +86,12 @@ func ScrapeStandings(db *sql.DB) error {
 				   log.Printf("Error checking standing status for team %s: %v", apiStanding.TournamentTeamName, err)
 				   // proceed and try to insert/update anyway
 			   }
-			   if status.Valid && status.Int64 == 0 {
-				   log.Printf("Found existing standing with status=0 for team %s — forcing update", apiStanding.TournamentTeamName)
+			   // New semantics: status==0 => ON / allow pull; status==1 => OFF / do not pull for this standing id
+			   if status.Valid && status.Int64 == 1 {
+				   log.Printf("Skipping standing update for team %s because status=1 (OFF)", apiStanding.TournamentTeamName)
+				   continue
 			   }
-			   // พยายามบันทึก/อัปเดตเสมอ (บังคับ) เพื่อแก้ปัญหาการถูกข้ามเมื่อ status=0
+			   // proceed to save (status is either NULL or 0)
 			   log.Printf("Saving standing: league=%d team=%d stage=%v points=%d rank=%d", standingDB.LeagueID, standingDB.TeamID, standingDB.StageID, standingDB.Points, apiStanding.CurrentRank)
 			   err = database.InsertOrUpdateStanding(db, standingDB)
 			   if err != nil {

@@ -118,7 +118,7 @@ CREATE TABLE IF NOT EXISTS `standings` (
     `goal_difference` INT DEFAULT 0,    -- ผลต่างประตูได้เสีย
     `points` INT DEFAULT 0,             -- คะแนนรวม
     `current_rank` INT,                 -- อันดับปัจจุบัน
-    `status` INT DEFAULT 1,             -- รอบการแข่งขัน (ถ้ามี) ค่า default = 1
+    `status` INT DEFAULT 0,             -- ดึงข้อมูล ค่า default =0
     UNIQUE (`league_id`, `team_id`, `stage_id`), -- กำหนดให้แต่ละทีมมีข้อมูลคะแนนเดียวในแต่ละลีกและสเตจ
     FOREIGN KEY (`league_id`) REFERENCES `leagues`(`id`),
     FOREIGN KEY (`team_id`) REFERENCES `teams`(`id`)
