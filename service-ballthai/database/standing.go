@@ -79,8 +79,15 @@ func GetStandingsByLeagueID(db *sql.DB, leagueID int) ([]models.StandingDB, erro
 // InsertOrUpdateStanding inserts or updates a league standing record in the database
 func InsertOrUpdateStanding(db *sql.DB, standing models.StandingDB) error {
 	var existingStandingID int
-	query := "SELECT id FROM standings WHERE league_id = ? AND team_id = ? AND stage_id = ?"
-	err := db.QueryRow(query, standing.LeagueID, standing.TeamID, standing.StageID).Scan(&existingStandingID)
+	var err error
+	// Use different SELECT when stage_id is NULL because `= NULL` never matches
+	if standing.StageID.Valid {
+		log.Printf("[InsertOrUpdateStanding] Looking for existing standing (league=%d team=%d stage=%d)", standing.LeagueID, standing.TeamID, standing.StageID.Int64)
+		err = db.QueryRow("SELECT id FROM standings WHERE league_id = ? AND team_id = ? AND stage_id = ?", standing.LeagueID, standing.TeamID, standing.StageID.Int64).Scan(&existingStandingID)
+	} else {
+		log.Printf("[InsertOrUpdateStanding] Looking for existing standing (league=%d team=%d stage=NULL)", standing.LeagueID, standing.TeamID)
+		err = db.QueryRow("SELECT id FROM standings WHERE league_id = ? AND team_id = ? AND stage_id IS NULL", standing.LeagueID, standing.TeamID).Scan(&existingStandingID)
+	}
 
 	if err == sql.ErrNoRows {
 		// Insert new standing (เพิ่ม stage_id, status)

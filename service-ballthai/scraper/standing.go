@@ -29,14 +29,26 @@ func ScrapeStandings(db *sql.DB) error {
 			   continue
 		   }
 
+		   log.Printf("Fetched %d standing entries for league %s", len(apiResponse), league.Name)
+
 		   for _, apiStanding := range apiResponse {
 			   // รับ Team ID
 			   teamID := 0
 			   if apiStanding.TournamentTeamName != "" {
 				   tID, err := database.GetTeamIDByThaiName(db, apiStanding.TournamentTeamName, apiStanding.TournamentTeamLogo)
 				   if err != nil {
-					   log.Printf("Warning: Failed to get team ID for standing team %s: %v", apiStanding.TournamentTeamName, err)
-					   continue
+					   log.Printf("Warning: Failed to get team ID for standing team '%s': %v", apiStanding.TournamentTeamName, err)
+					   // try to ensure team exists (download logo/insert team) if helper available
+					   if err2 := ensureTeamAndLogo(db, apiStanding.TournamentTeamName); err2 != nil {
+						   log.Printf("Also failed to ensure team '%s': %v", apiStanding.TournamentTeamName, err2)
+						   continue
+					   }
+					   tID2, err3 := database.GetTeamIDByThaiName(db, apiStanding.TournamentTeamName, apiStanding.TournamentTeamLogo)
+					   if err3 != nil {
+						   log.Printf("Still failed to get team ID for '%s' after ensure: %v", apiStanding.TournamentTeamName, err3)
+						   continue
+					   }
+					   tID = tID2
 				   }
 				   teamID = tID
 			   } else {
@@ -72,16 +84,18 @@ func ScrapeStandings(db *sql.DB) error {
 			   status, err := database.GetStandingStatus(db, league.ID, teamID, stageID)
 			   if err != nil {
 				   log.Printf("Error checking standing status for team %s: %v", apiStanding.TournamentTeamName, err)
-				   continue
+				   // proceed and try to insert/update anyway
 			   }
 			   if status.Valid && status.Int64 == 0 {
-				   log.Printf("Skip update standing for team %s (status=0/OFF)", apiStanding.TournamentTeamName)
-				   continue
+				   log.Printf("Found existing standing with status=0 for team %s — forcing update", apiStanding.TournamentTeamName)
 			   }
-			   // ถ้าไม่มี row หรือ status=1 (ON) ให้บันทึก/อัปเดตได้
+			   // พยายามบันทึก/อัปเดตเสมอ (บังคับ) เพื่อแก้ปัญหาการถูกข้ามเมื่อ status=0
+			   log.Printf("Saving standing: league=%d team=%d stage=%v points=%d rank=%d", standingDB.LeagueID, standingDB.TeamID, standingDB.StageID, standingDB.Points, apiStanding.CurrentRank)
 			   err = database.InsertOrUpdateStanding(db, standingDB)
 			   if err != nil {
 				   log.Printf("Error saving standing for team %s in league %s to DB: %v", apiStanding.TournamentTeamName, league.Name, err)
+			   } else {
+				   log.Printf("Saved standing for team %s in league %s", apiStanding.TournamentTeamName, league.Name)
 			   }
 		   }
 	   }
