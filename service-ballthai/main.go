@@ -19,17 +19,55 @@ import (
 var db *sql.DB // ตัวแปร Global สำหรับเก็บ Connection ฐานข้อมูล
 
 func main() {
-   // --- Cronjob: ดึง /scraper/matches ทุก 30 นาที ---
+   // --- Cronjob: ดึง /scraper/matches และ standings โดยใช้ BASE_URL จาก env ---
+   baseURL := os.Getenv("BASE_URL")
+   if baseURL == "" {
+	   baseURL = "http://localhost:8080"
+   }
+   log.Printf("[CRON] Using BASE_URL for cronjob: %s", baseURL)
+
    c := cron.New()
-   c.AddFunc("0,30 * * * *", func() {
-	   resp, err := http.Get("http://localhost:8080/scraper/matches")
-	   if err != nil {
-		   log.Println("cron fetch error /scraper/matches:", err)
-		   return
-	   }
-	   defer resp.Body.Close()
-	   log.Println("cron fetch /scraper/matches status:", resp.Status)
-   })
+   matchesTimes := []string{
+	   "55 17 * * *", // 17:55
+	   "55 18 * * *", // 18:55
+	   "55 19 * * *", // 19:55
+	   "55 20 * * *", // 20:55
+	   "55 21 * * *", // 21:55
+	   "10 8 * * *",  // 08:10
+   }
+   for _, expr := range matchesTimes {
+	   c.AddFunc(expr, func() {
+		   url := baseURL + "/scraper/matches"
+		   resp, err := http.Get(url)
+		   if err != nil {
+			   log.Println("cron fetch error /scraper/matches:", err)
+			   return
+		   }
+		   defer resp.Body.Close()
+		   log.Println("cron fetch /scraper/matches status:", resp.Status)
+	   })
+   }
+
+   standingsTimes := []string{
+	   "45 17 * * *", // 17:45
+	   "45 18 * * *", // 18:45
+	   "45 19 * * *", // 19:45
+	   "45 20 * * *", // 20:45
+	   "45 21 * * *", // 21:45
+	   "20 8 * * *",  // 08:20
+   }
+   for _, expr := range standingsTimes {
+	   c.AddFunc(expr, func() {
+		   url := baseURL + "/scraper/standings"
+		   resp, err := http.Get(url)
+		   if err != nil {
+			   log.Println("cron fetch error /scraper/standings:", err)
+			   return
+		   }
+		   defer resp.Body.Close()
+		   log.Println("cron fetch /scraper/standings status:", resp.Status)
+	   })
+   }
    c.Start()
 // ...existing code...
 	// ...existing code...
