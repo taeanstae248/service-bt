@@ -322,7 +322,7 @@ async function initStandingsPage() {
                 btn.type = 'button';
                 btn.className = 'btn-secondary';
                 btn.style = 'margin-left:8px;padding:0.4rem 0.8rem;';
-                btn.innerText = '🔄 รีเฟรชตาราง';
+                btn.innerText = '🔄 รีเฟรชตาราง'; //test
                 sel.parentNode.insertBefore(btn, sel.nextSibling);
             }
             btn.onclick = refreshStandings;
