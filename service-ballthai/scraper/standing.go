@@ -35,7 +35,7 @@ func ScrapeStandings(db *sql.DB) error {
 			   // รับ Team ID
 			   teamID := 0
 			   if apiStanding.TournamentTeamName != "" {
-				   tID, err := database.GetTeamIDByThaiName(db, apiStanding.TournamentTeamName, apiStanding.TournamentTeamLogo)
+				   tID, err := database.GetTeamIDByThaiName(db, apiStanding.TournamentTeamName, "")
 				   if err != nil {
 					   log.Printf("Warning: Failed to get team ID for standing team '%s': %v", apiStanding.TournamentTeamName, err)
 					   // try to ensure team exists (download logo/insert team) if helper available
@@ -43,7 +43,7 @@ func ScrapeStandings(db *sql.DB) error {
 						   log.Printf("Also failed to ensure team '%s': %v", apiStanding.TournamentTeamName, err2)
 						   continue
 					   }
-					   tID2, err3 := database.GetTeamIDByThaiName(db, apiStanding.TournamentTeamName, apiStanding.TournamentTeamLogo)
+					   tID2, err3 := database.GetTeamIDByThaiName(db, apiStanding.TournamentTeamName, "")
 					   if err3 != nil {
 						   log.Printf("Still failed to get team ID for '%s' after ensure: %v", apiStanding.TournamentTeamName, err3)
 						   continue
