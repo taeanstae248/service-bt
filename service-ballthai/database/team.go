@@ -87,43 +87,43 @@ func InsertOrUpdateTeam(db *sql.DB, team models.TeamDB) error {
 	       log.Printf("Inserted new team: %s", team.NameTH)
        } else if err != nil {
 	       return fmt.Errorf("failed to query existing team %s: %w", team.NameTH, err)
-       } else {
-	       // Update existing team
-	       // ถ้า logoDBPath ไม่ว่าง ให้ update logo_url ด้วย, ถ้าว่างให้ข้าม logo_url
-	       if logoDBPath != "" {
-		       updateQuery := `
-			       UPDATE teams SET
-				       name_en = ?, logo_url = ?,
-				       team_post_ballthai = ?, website = ?, shop = ?, stadium_id = ?
-			       WHERE id = ?
-		       `
-		       _, err := db.Exec(updateQuery,
-			       team.NameEN, sql.NullString{String: logoDBPath, Valid: true},
-			       team.TeamPostBallthai, team.Website, team.Shop, team.StadiumID,
-			       existingTeamID,
-		       )
-		       if err != nil {
-			       return fmt.Errorf("failed to update team %s: %w", team.NameTH, err)
-		       }
-		       log.Printf("Updated existing team: %s (ID: %d)", team.NameTH, existingTeamID)
-	       } else {
-		       updateQuery := `
-			       UPDATE teams SET
-				       name_en = ?,
-				       team_post_ballthai = ?, website = ?, shop = ?, stadium_id = ?
-			       WHERE id = ?
-		       `
-		       _, err := db.Exec(updateQuery,
-			       team.NameEN,
-			       team.TeamPostBallthai, team.Website, team.Shop, team.StadiumID,
-			       existingTeamID,
-		       )
-		       if err != nil {
-			       return fmt.Errorf("failed to update team %s: %w", team.NameTH, err)
-		       }
-		       log.Printf("Updated existing team (no logo change): %s (ID: %d)", team.NameTH, existingTeamID)
-	       }
-       }
+	} else {
+		// Update existing team
+		// Build SET clause dynamically so we don't overwrite fields that caller didn't provide.
+		// Always update name_en. Only update logo_url when logoDBPath != "".
+		// Only update team_post_ballthai when caller provided a valid value (Valid == true).
+		setClauses := []string{"name_en = ?"}
+		args := []interface{}{team.NameEN}
+
+		if logoDBPath != "" {
+			setClauses = append(setClauses, "logo_url = ?")
+			args = append(args, sql.NullString{String: logoDBPath, Valid: true})
+		}
+
+		if team.TeamPostBallthai.Valid {
+			setClauses = append(setClauses, "team_post_ballthai = ?")
+			args = append(args, team.TeamPostBallthai)
+		}
+
+		// Common optional fields
+		setClauses = append(setClauses, "website = ?", "shop = ?", "stadium_id = ?")
+		args = append(args, team.Website, team.Shop, team.StadiumID)
+
+		// Finalize query
+		updateQuery := "UPDATE teams SET " + strings.Join(setClauses, ", ") + " WHERE id = ?"
+		args = append(args, existingTeamID)
+
+		_, err := db.Exec(updateQuery, args...)
+		if err != nil {
+			return fmt.Errorf("failed to update team %s: %w", team.NameTH, err)
+		}
+
+		if logoDBPath != "" {
+			log.Printf("Updated existing team (logo updated): %s (ID: %d)", team.NameTH, existingTeamID)
+		} else {
+			log.Printf("Updated existing team: %s (ID: %d)", team.NameTH, existingTeamID)
+		}
+	}
 	return nil
 }
 

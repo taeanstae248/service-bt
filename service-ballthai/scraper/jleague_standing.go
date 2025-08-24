@@ -58,50 +58,50 @@ func ScrapeJLeagueStandings(db *sql.DB) error {
 	}
 
 	// Find league table (similar to your PHP: '.league table')
-	doc.Find(".league table tbody tr").Each(func(i int, s *goquery.Selection) {
-		// Extract team data from each row
-		teamData := extractJLeagueTeamData(s)
-		if teamData == nil {
-			return // Skip invalid rows
-		}
+       doc.Find(".league table tbody tr").Each(func(i int, s *goquery.Selection) {
+	       // Extract team data from each row
+	       teamData := extractJLeagueTeamData(s)
+	       if teamData == nil {
+		       return // Skip invalid rows
+	       }
 
-		// Download team logo if needed
-		if teamData.LogoURL != "" {
-			teamData.LogoPath = downloadTeamLogo(teamData.LogoURL)
-		}
+	       // Download team logo if needed
+	       if teamData.LogoURL != "" {
+		       teamData.LogoPath = downloadTeamLogo(teamData.LogoURL)
+	       }
 
-		// Get or create team ID
-		teamID, err := getOrCreateTeamID(db, teamData.Name, teamData.LogoPath, config.LeagueID)
-		if err != nil {
-			log.Printf("Error getting team ID for %s: %v", teamData.Name, err)
-			return
-		}
+	       // Get or create team ID
+	       teamID, err := getOrCreateTeamID(db, teamData.Name, teamData.LogoPath, config.LeagueID)
+	       if err != nil {
+		       log.Printf("Error getting team ID for %s: %v", teamData.Name, err)
+		       return
+	       }
 
-		// Prepare standing data
-		standingDB := models.StandingDB{
-			LeagueID:       config.LeagueID,
-			TeamID:         teamID,
-			MatchesPlayed:  teamData.Played,
-			Wins:           teamData.Wins,
-			Draws:          teamData.Draws,
-			Losses:         teamData.Losses,
-			GoalsFor:       teamData.GoalsFor,
-			GoalsAgainst:   teamData.GoalsAgainst,
-			GoalDifference: teamData.GoalDifference,
-			Points:         teamData.Points,
-			CurrentRank:    sql.NullInt64{Int64: int64(teamData.Position), Valid: teamData.Position != 0},
-			Status:         sql.NullInt64{Valid: false}, // เพิ่ม status (null)
-		}
+	       // Prepare standing data
+	       standingDB := models.StandingDB{
+		       LeagueID:       config.LeagueID,
+		       TeamID:         teamID,
+		       MatchesPlayed:  teamData.Played,
+		       Wins:           teamData.Wins,
+		       Draws:          teamData.Draws,
+		       Losses:         teamData.Losses,
+		       GoalsFor:       teamData.GoalsFor,
+		       GoalsAgainst:   teamData.GoalsAgainst,
+		       GoalDifference: teamData.GoalDifference,
+		       Points:         teamData.Points,
+		       CurrentRank:    sql.NullInt64{Int64: int64(teamData.Position), Valid: teamData.Position != 0},
+		       Status:         sql.NullInt64{Valid: false}, // เพิ่ม status (null)
+	       }
 
-		// Insert or update standing in database
-		err = database.InsertOrUpdateStanding(db, standingDB)
-		if err != nil {
-			log.Printf("Error saving standing for team %s: %v", teamData.Name, err)
-		} else {
-			log.Printf("Successfully saved standing for %s (Position: %d, Points: %d)",
-				teamData.Name, teamData.Position, teamData.Points)
-		}
-	})
+	       // Insert or update standing in database
+	       err = database.InsertOrUpdateStanding(db, standingDB)
+	       if err != nil {
+		       log.Printf("Error saving standing for team %s: %v", teamData.Name, err)
+	       } else {
+		       log.Printf("Successfully saved standing for %s (Position: %d, Points: %d)",
+			       teamData.Name, teamData.Position, teamData.Points)
+	       }
+       })
 
 	log.Printf("Completed scraping J-League standings")
 	return nil
