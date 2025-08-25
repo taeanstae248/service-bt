@@ -43,13 +43,23 @@ func main() {
    })
 	// Also fetch standings on the same schedule but every 10 minutes from the base hour
 	c.AddFunc("10 7,15-21 * * *", func() {
+	   // Fetch main standings
 	   resp, err := http.Get("https://svc.ballthai.com/scraper/standing")
 	   if err != nil {
 		   log.Println("cron fetch error /scraper/standing:", err)
-		   return
+	   } else {
+		   defer resp.Body.Close()
+		   log.Println("cron fetch /scraper/standing status:", resp.Status)
 	   }
-	   defer resp.Body.Close()
-	   log.Println("cron fetch /scraper/standing status:", resp.Status)
+
+	   // Also trigger the J-League specific scraper endpoint
+	   resp2, err2 := http.Get("https://svc.ballthai.com/scraper/jleague")
+	   if err2 != nil {
+		   log.Println("cron fetch error /scraper/jleague:", err2)
+	   } else {
+		   defer resp2.Body.Close()
+		   log.Println("cron fetch /scraper/jleague status:", resp2.Status)
+	   }
    })
    c.Start()
 	// ประกาศตัวแปร db และ err
