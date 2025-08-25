@@ -357,3 +357,24 @@ async function refreshStandings() {
 }
 
 initStandingsPage();
+
+// Trigger scraping J-League from admin UI
+function scrapeJLeague() {
+    if (!confirm('ต้องการดึงข้อมูล J-League หรือไม่?')) return;
+    const btn = document.getElementById('scrapeJLeagueBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'กำลังดึง J-League...'; }
+    const baseUrl = window.location.origin;
+    fetch(baseUrl + '/scraper/jleague')
+        .then(res => res.text())
+        .then(text => {
+            alert('ผลลัพธ์ J-League: ' + text);
+            // refresh standings after scraping
+            try { if (typeof onLeagueChange === 'function') onLeagueChange(); } catch(e){}
+        })
+        .catch(err => {
+            alert('ดึง J-League ไม่สำเร็จ: ' + (err && err.message ? err.message : err));
+        })
+        .finally(() => {
+            if (btn) { btn.disabled = false; btn.textContent = '🏟️ ดึง J-League'; }
+        });
+}
