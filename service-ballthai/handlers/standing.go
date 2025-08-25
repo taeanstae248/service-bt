@@ -241,8 +241,9 @@ func GetStandings(w http.ResponseWriter, r *http.Request) {
 	       CurrentRank    int             `json:"current_rank"`
 			   StageName      string          `json:"stage_name"`
 			   Status         sql.NullInt64   `json:"status"`
-			   LogoHome       *string         `json:"logo_home"`
-			   LogoAway       *string         `json:"logo_away"`
+			LogoHome       *string         `json:"logo_home"`
+			LogoAway       *string         `json:"logo_away"`
+			TeamPostID     *string         `json:"team_post_id,omitempty"`
        }
        var result []standingAPI
        for _, s := range standings {
@@ -270,7 +271,13 @@ func GetStandings(w http.ResponseWriter, r *http.Request) {
 	       if s.CurrentRank.Valid {
 		       currentRank = int(s.CurrentRank.Int64)
 	       }
-			   result = append(result, standingAPI{
+       		// convert sql.NullString to *string
+       		var teamPostPtr *string
+       		if s.TeamPost.Valid {
+       			v := s.TeamPost.String
+       			teamPostPtr = &v
+       		}
+       		result = append(result, standingAPI{
 		       ID:             s.ID,
 		       LeagueID:       s.LeagueID,
 		       TeamID:         s.TeamID,
@@ -288,6 +295,7 @@ func GetStandings(w http.ResponseWriter, r *http.Request) {
 				   Status:         s.Status,
 				   LogoHome:       s.TeamLogo,
 				   LogoAway:       s.TeamLogo,
+			   TeamPostID:     teamPostPtr,
 	       })
        }
        json.NewEncoder(w).Encode(map[string]interface{}{

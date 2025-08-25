@@ -28,6 +28,7 @@ type StandingDB struct {
 	TeamID         int           `json:"team_id"`
 	TeamName       *string       `json:"team_name"`
 	TeamLogo       *string       `json:"team_logo"`
+	TeamPost       sql.NullString `json:"team_post_ballthai"`
 	StageID        sql.NullInt64 `json:"stage_id"`
 	Status         sql.NullInt64 `json:"status"`
 	MatchesPlayed  int           `json:"matches_played"`
