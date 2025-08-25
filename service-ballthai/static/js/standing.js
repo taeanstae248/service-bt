@@ -337,6 +337,11 @@ async function initStandingsPage() {
     } catch (e) {
         console.warn('failed to attach refresh button', e);
     }
+        // attach J-League scrape button handler if present
+        try {
+            const jbtn = document.getElementById('scrapeJLeagueBtn');
+            if (jbtn) jbtn.onclick = scrapeJLeague;
+        } catch (e) {}
 }
 
 // Refresh standings UI for currently selected league with a simple loading state
