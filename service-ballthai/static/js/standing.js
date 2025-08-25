@@ -18,6 +18,34 @@ async function fetchLeagues() {
     }
 }
 
+// Safe attach for J-League button: call window.scrapeJLeague() if available, avoid ReferenceError
+function _attachScrapeJLeagueFallback() {
+    try {
+        const jbtn = document.getElementById('scrapeJLeagueBtn');
+        if (!jbtn) return;
+        jbtn.addEventListener('click', function (e) {
+            // call only when function is defined to avoid reference errors
+            if (typeof window.scrapeJLeague === 'function') {
+                window.scrapeJLeague();
+            } else {
+                // function not ready yet; give visual feedback
+                jbtn.disabled = true;
+                const old = jbtn.textContent;
+                jbtn.textContent = 'กำลังเตรียม...';
+                // wait briefly then try to call if available
+                setTimeout(() => {
+                    if (typeof window.scrapeJLeague === 'function') window.scrapeJLeague();
+                    jbtn.disabled = false;
+                    jbtn.textContent = old;
+                }, 500);
+            }
+        });
+    } catch (e) {
+        // ignore
+    }
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _attachScrapeJLeagueFallback); else _attachScrapeJLeagueFallback();
+
 let lastStageDropdown = null;
 async function renderStandingsTableWithStage(standings) {
     window._debugStandings = standings;
