@@ -19,9 +19,15 @@ func GetAllLeagues(db *sql.DB) ([]models.LeagueDB, error) {
     var leagues []models.LeagueDB
     for rows.Next() {
         var l models.LeagueDB
-        err := rows.Scan(&l.ID, &l.Name, &l.ThaileageID)
+        var thaileage sql.NullInt64
+        err := rows.Scan(&l.ID, &l.Name, &thaileage)
         if err != nil {
             return nil, err
+        }
+        if thaileage.Valid {
+            l.ThaileageID = int(thaileage.Int64)
+        } else {
+            l.ThaileageID = 0
         }
         leagues = append(leagues, l)
     }

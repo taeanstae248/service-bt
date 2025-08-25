@@ -33,7 +33,7 @@ func ScrapeJLeagueStandings(db *sql.DB) error {
 	}
 
 	config := JLeagueStandingConfig{
-		URL:      "https://football.kapook.com/tournament/jleague/table",
+		URL:      "https://www.jleague.co/th/standings/j1/2024/",
 		LeagueID: leagueID, // Dynamic J-League ID from database
 		Name:     "J-League",
 	}
@@ -57,8 +57,8 @@ func ScrapeJLeagueStandings(db *sql.DB) error {
 		return fmt.Errorf("failed to parse HTML: %v", err)
 	}
 
-	// Find league table (similar to your PHP: '.league table')
-       doc.Find(".league table tbody tr").Each(func(i int, s *goquery.Selection) {
+	// Find league table (.standing-table)
+	doc.Find("table.standing-table tbody tr").Each(func(i int, s *goquery.Selection) {
 	       // Extract team data from each row
 	       teamData := extractJLeagueTeamData(s)
 	       if teamData == nil {
@@ -111,6 +111,7 @@ func ScrapeJLeagueStandings(db *sql.DB) error {
 type JLeagueTeamData struct {
 	Position       int
 	Name           string
+	Slug           string
 	LogoURL        string
 	LogoPath       string
 	Played         int
@@ -121,6 +122,7 @@ type JLeagueTeamData struct {
 	GoalsAgainst   int
 	GoalDifference int
 	Points         int
+	Form           string // recent form like "WDLWW"
 }
 
 // extractJLeagueTeamData extracts team data from a table row
@@ -135,17 +137,24 @@ func extractJLeagueTeamData(s *goquery.Selection) *JLeagueTeamData {
 
 	// Team name and logo (column 1)
 	teamCell := s.Find("td").Eq(1)
-	teamData.Name = strings.TrimSpace(teamCell.Text())
+	// name is inside span.club-item__name
+	nameSel := teamCell.Find("span.club-item__name").First()
+	teamData.Name = strings.TrimSpace(nameSel.Text())
 
-	// Extract logo URL
-	if logoImg := teamCell.Find("a img").First(); logoImg.Length() > 0 {
-		if logoURL, exists := logoImg.Attr("src"); exists {
+	// Extract logo URL and club slug
+	if logoImg := teamCell.Find("img.club-emblem__image").First(); logoImg.Length() > 0 {
+		if logoURL, exists := logoImg.Attr("data-src"); exists && logoURL != "" {
 			teamData.LogoURL = logoURL
+		} else if logoURL, exists := logoImg.Attr("src"); exists {
+			teamData.LogoURL = logoURL
+		}
+		if slug, exists := logoImg.Attr("data-club-slug"); exists {
+			teamData.Slug = strings.TrimSpace(slug)
 		}
 	}
 
-	// Handle team name mapping (similar to your PHP)
-	teamData.Name = mapJLeagueTeamName(teamData.Name)
+	// Handle team name mapping (if needed)
+	teamData.Name = mapJLeagueTeamName(strings.ToUpper(teamData.Name))
 
 	// Extract other statistics
 	cells := s.Find("td")
@@ -158,6 +167,17 @@ func extractJLeagueTeamData(s *goquery.Selection) *JLeagueTeamData {
 		teamData.GoalsAgainst, _ = strconv.Atoi(strings.TrimSpace(cells.Eq(7).Text()))
 		teamData.GoalDifference, _ = strconv.Atoi(strings.TrimSpace(cells.Eq(8).Text()))
 		teamData.Points, _ = strconv.Atoi(strings.TrimSpace(cells.Eq(9).Text()))
+
+		// Form column (index 10) - build short string of results
+		formSel := cells.Eq(10)
+		form := ""
+		formSel.Find(".form-item").Each(func(i int, f *goquery.Selection) {
+			t := strings.TrimSpace(f.Text())
+			if t != "" {
+				form += t
+			}
+		})
+		teamData.Form = form
 	}
 
 	// Validate that we have essential data
@@ -196,6 +216,9 @@ func downloadTeamLogo(logoURL string) string {
 	// Fix relative URLs by adding https scheme
 	if strings.HasPrefix(logoURL, "//") {
 		logoURL = "https:" + logoURL
+	} else if strings.HasPrefix(logoURL, "/") {
+		// site-relative path -> prefix host
+		logoURL = "https://www.jleague.co" + logoURL
 	}
 
 	// Create logo path into img/teams
