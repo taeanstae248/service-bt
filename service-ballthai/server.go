@@ -33,13 +33,23 @@ func main() {
    c := cron.New()
    // ดึงทุกชั่วโมง เฉพาะ 7, 15, 16, 17, 18, 19, 20, 21 น.
    c.AddFunc("0 7,15-21 * * *", func() {
-	   resp, err := http.Get("http://localhost:8080/scraper/matches")
+	   resp, err := http.Get("https://svc.ballthai.com/scraper/matches")
 	   if err != nil {
 		   log.Println("cron fetch error /scraper/matches:", err)
 		   return
 	   }
 	   defer resp.Body.Close()
 	   log.Println("cron fetch /scraper/matches status:", resp.Status)
+   })
+	// Also fetch standings on the same schedule but every 10 minutes from the base hour
+	c.AddFunc("10 7,15-21 * * *", func() {
+	   resp, err := http.Get("https://svc.ballthai.com/scraper/standing")
+	   if err != nil {
+		   log.Println("cron fetch error /scraper/standing:", err)
+		   return
+	   }
+	   defer resp.Body.Close()
+	   log.Println("cron fetch /scraper/standing status:", resp.Status)
    })
    c.Start()
 	// ประกาศตัวแปร db และ err
