@@ -327,17 +327,17 @@ func ScrapeThaileagueMatches(db *sql.DB, targetLeague string) error { // เพ�
 		   return fmt.Errorf("failed to get leagues from DB: %w", err)
 	   }
 
-	   for _, league := range leagues {
-		   // ถ้า targetLeague ไม่ว่าง ให้ filter เฉพาะลีกที่ตรง
-		   if targetLeague != "" && targetLeague != "all" && league.Name != targetLeague {
-			   continue
-		   }
-		   // ข้ามลีกที่ thaileageid เป็น 0 หรือว่าง
-		   if league.ThaileageID == 0 {
-			   continue
-		   }
-		   tournamentParam := fmt.Sprintf("&tournament=%d", league.ThaileageID)
-		   log.Printf("Scraping league: %s (thaileageid=%d)", league.Name, league.ThaileageID)
+	for _, league := range leagues {
+		// ถ้า targetLeague ไม่ว่าง ให้ filter เฉพาะลีกที่ตรง
+		if targetLeague != "" && targetLeague != "all" && league.Name != targetLeague {
+			continue
+		}
+		// ข้ามลีกที่ thaileageid เป็น 0 หรือว่าง
+		if !league.ThaileageID.Valid || league.ThaileageID.Int64 == 0 {
+			continue
+		}
+		tournamentParam := fmt.Sprintf("&tournament=%d", league.ThaileageID.Int64)
+		log.Printf("Scraping league: %s (thaileageid=%d)", league.Name, league.ThaileageID.Int64)
 		  if err := scrapeMatchesByConfig(db, baseURL, singlePage, tournamentParam, league.Name, league.ID); err != nil {
 			   log.Printf("Error scraping %s: %v", league.Name, err)
 		   }

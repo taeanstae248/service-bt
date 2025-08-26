@@ -89,6 +89,7 @@ type Player struct {
 	Weight        *string `json:"weight,omitempty"`
 	Nationality   *string `json:"nationality,omitempty"`
 	PlayerPostID  *int    `json:"player_post_id,omitempty"`
+	Goals         *int    `json:"goals,omitempty"`
 	ProfileImage  *string `json:"profile_image,omitempty"`
 	DateOfBirth   *string `json:"date_of_birth,omitempty"`
 	PlaceOfBirth  *string `json:"place_of_birth,omitempty"`

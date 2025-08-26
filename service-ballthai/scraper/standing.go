@@ -15,12 +15,12 @@ func ScrapeStandings(db *sql.DB) error {
 	   if err != nil {
 		   return err
 	   }
-	   for _, league := range leagues {
-		   if league.ThaileageID == 0 {
-			   continue
-		   }
-		   url := fmt.Sprintf("https://competition.tl.prod.c0d1um.io/thaileague/api/stage-standing-public/?tournament=%d", league.ThaileageID)
-		   log.Printf("Scraping standings for %s (%s)", league.Name, url)
+	for _, league := range leagues {
+		if !league.ThaileageID.Valid || league.ThaileageID.Int64 == 0 {
+			continue
+		}
+		url := fmt.Sprintf("https://competition.tl.prod.c0d1um.io/thaileague/api/stage-standing-public/?tournament=%d", league.ThaileageID.Int64)
+		log.Printf("Scraping standings for %s (%s)", league.Name, url)
 
 		   var apiResponse []models.StandingAPI
 		   err := FetchAndParseAPI(url, &apiResponse)

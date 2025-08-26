@@ -43,23 +43,13 @@ func main() {
    })
 	// Also fetch standings on the same schedule but every 10 minutes from the base hour
 	c.AddFunc("10 7,15-21 * * *", func() {
-	   // Fetch main standings
 	   resp, err := http.Get("https://svc.ballthai.com/scraper/standing")
 	   if err != nil {
 		   log.Println("cron fetch error /scraper/standing:", err)
-	   } else {
-		   defer resp.Body.Close()
-		   log.Println("cron fetch /scraper/standing status:", resp.Status)
+		   return
 	   }
-
-	   // Also trigger the J-League specific scraper endpoint
-	   resp2, err2 := http.Get("https://svc.ballthai.com/scraper/jleague")
-	   if err2 != nil {
-		   log.Println("cron fetch error /scraper/jleague:", err2)
-	   } else {
-		   defer resp2.Body.Close()
-		   log.Println("cron fetch /scraper/jleague status:", resp2.Status)
-	   }
+	   defer resp.Body.Close()
+	   log.Println("cron fetch /scraper/standing status:", resp.Status)
    })
    c.Start()
 	// ประกาศตัวแปร db และ err
@@ -151,6 +141,7 @@ func main() {
 
 	// Player routes
 	router.HandleFunc("/api/players", handlers.GetPlayers).Methods("GET")
+	router.HandleFunc("/api/players/top-scorers", handlers.GetTopScorers).Methods("GET")
 	router.HandleFunc("/api/players/team/{team_id}", handlers.GetPlayersByTeamID).Methods("GET")
 	router.HandleFunc("/api/players/team-post/{team_post_id}", handlers.GetPlayersByTeamPost).Methods("GET")
 	router.HandleFunc("/api/players/{id:[0-9]+}", handlers.UpdatePlayer).Methods("PUT")

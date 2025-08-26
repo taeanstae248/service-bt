@@ -43,8 +43,8 @@ func ScrapeMatchesHandler(w http.ResponseWriter, r *http.Request) {
 	baseURL := "https://competition.tl.prod.c0d1um.io/thaileague/api/match-day-match-public/?page=1&tournament="
 
 	for _, league := range leagues {
-		if league.ThaileageID != 0 {
-			url := baseURL + fmt.Sprintf("%d", league.ThaileageID)
+		if league.ThaileageID.Valid && league.ThaileageID.Int64 != 0 {
+			url := baseURL + fmt.Sprintf("%d", league.ThaileageID.Int64)
 			resultMsg += fmt.Sprintf("%s\n%s\n\n", league.Name, url)
 		}
 	}

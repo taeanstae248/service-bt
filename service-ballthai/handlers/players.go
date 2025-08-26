@@ -2,6 +2,7 @@
 package handlers
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -172,6 +173,110 @@ func GetPlayers(w http.ResponseWriter, r *http.Request) {
 		Data:    players,
 	}
 
+	json.NewEncoder(w).Encode(response)
+}
+
+// GetTopScorers returns players ordered by goals (supports league_id and limit)
+func GetTopScorers(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	limitStr := r.URL.Query().Get("limit")
+	leagueIDStr := r.URL.Query().Get("league_id")
+
+	limit := 50
+	if limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+			limit = l
+		}
+	}
+
+	query := `
+		SELECT p.id, p.name, p.position, p.shirt_number, p.team_id, t.name_th as team_name,
+			   t.team_post_ballthai as team_post_id, n.name as nationality,
+			   p.photo_url, p.goals
+		FROM players p
+		LEFT JOIN teams t ON p.team_id = t.id
+		LEFT JOIN nationalities n ON p.nationality_id = n.id
+	`
+
+	var args []interface{}
+	if leagueIDStr != "" {
+		if leagueID, err := strconv.Atoi(leagueIDStr); err == nil {
+			query += " WHERE p.league_id = ?"
+			args = append(args, leagueID)
+		} else {
+			http.Error(w, "Invalid league_id parameter", http.StatusBadRequest)
+			return
+		}
+	}
+
+	query += " ORDER BY p.goals DESC LIMIT ?"
+	args = append(args, limit)
+
+	rows, err := DB.Query(query, args...)
+	if err != nil {
+		log.Printf("Database error in GetTopScorers: %v", err)
+		http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var players []Player
+	for rows.Next() {
+	var player Player
+	var shirt sql.NullInt64
+	var pos sql.NullString
+	var teamName sql.NullString
+	var teamPost sql.NullString
+	var nationality sql.NullString
+	var photo sql.NullString
+	var goals sql.NullInt64
+
+		if err := rows.Scan(&player.ID, &player.Name, &pos, &shirt,
+			&player.TeamID, &teamName, &teamPost, &nationality,
+			&photo, &goals); err != nil {
+			log.Printf("Scan error in GetTopScorers: %v", err)
+			http.Error(w, fmt.Sprintf("Scan error: %v", err), http.StatusInternalServerError)
+			return
+		}
+		if pos.Valid {
+			s := pos.String
+			player.Position = &s
+		}
+		if shirt.Valid {
+			v := int(shirt.Int64)
+			player.ShirtNumber = &v
+		}
+		if teamName.Valid {
+			s := teamName.String
+			player.TeamName = &s
+		}
+		if teamPost.Valid {
+			if tp, err := strconv.Atoi(teamPost.String); err == nil {
+				player.TeamPostID = &tp
+			}
+		}
+		if nationality.Valid {
+			s := nationality.String
+			player.Nationality = &s
+		}
+	// player_post not present in players table in this schema
+		if photo.Valid {
+			s := photo.String
+			player.ProfileImage = &s
+		}
+		if goals.Valid {
+			v := int(goals.Int64)
+			player.Goals = &v
+		}
+		// goals is used for ordering; if you want to include it in response we can extend Player struct
+		players = append(players, player)
+	}
+
+	response := APIResponse{
+		Success: true,
+		Data:    players,
+	}
 	json.NewEncoder(w).Encode(response)
 }
 

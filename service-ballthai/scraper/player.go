@@ -16,11 +16,11 @@ func ScrapePlayers(db *sql.DB) error {
 		return err
 	}
 	for _, league := range leagues {
-		if league.ThaileageID == 0 {
+		if !league.ThaileageID.Valid || league.ThaileageID.Int64 == 0 {
 			continue
 		}
-		apiURL := fmt.Sprintf("https://competition.tl.prod.c0d1um.io/thaileague/api/player-public/all_players_search/?page=1&tournament=%d", league.ThaileageID)
-		log.Printf("Scraping players from: %s (leagueID=%d, thaileageid=%d)", apiURL, league.ID, league.ThaileageID)
+		apiURL := fmt.Sprintf("https://competition.tl.prod.c0d1um.io/thaileague/api/player-public/all_players_search/?page=1&tournament=%d", league.ThaileageID.Int64)
+		log.Printf("Scraping players from: %s (leagueID=%d, thaileageid=%d)", apiURL, league.ID, league.ThaileageID.Int64)
 
 		var apiResponse struct {
 			Results []models.PlayerAPI `json:"results"`

@@ -24,11 +24,7 @@ func GetAllLeagues(db *sql.DB) ([]models.LeagueDB, error) {
         if err != nil {
             return nil, err
         }
-        if thaileage.Valid {
-            l.ThaileageID = int(thaileage.Int64)
-        } else {
-            l.ThaileageID = 0
-        }
+        l.ThaileageID = thaileage
         leagues = append(leagues, l)
     }
     return leagues, nil
