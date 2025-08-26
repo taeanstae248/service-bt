@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"time"
 
 	"go-ballthai-scraper/database" // ตรวจสอบให้แน่ใจว่าชื่อโมดูลตรงกับ go.mod ของคุณ
 	"go-ballthai-scraper/models"   // ตรวจสอบให้แน่ใจว่าชื่อโมดูลตรงกับ go.mod ของคุณ
@@ -19,19 +20,28 @@ func ScrapePlayers(db *sql.DB) error {
 		if !league.ThaileageID.Valid || league.ThaileageID.Int64 == 0 {
 			continue
 		}
-		apiURL := fmt.Sprintf("https://competition.tl.prod.c0d1um.io/thaileague/api/player-public/all_players_search/?page=1&tournament=%d", league.ThaileageID.Int64)
-		log.Printf("Scraping players from: %s (leagueID=%d, thaileageid=%d)", apiURL, league.ID, league.ThaileageID.Int64)
+		// paginate pages until empty results
+		maxPages := 50
+		for page := 1; page <= maxPages; page++ {
+			apiURL := fmt.Sprintf("https://competition.tl.prod.c0d1um.io/thaileague/api/player-public/all_players_search/?page=%d&tournament=%d", page, league.ThaileageID.Int64)
+			log.Printf("Scraping players from: %s (leagueID=%d, thaileageid=%d)", apiURL, league.ID, league.ThaileageID.Int64)
 
-		var apiResponse struct {
-			Results []models.PlayerAPI `json:"results"`
-		}
-		err := FetchAndParseAPI(apiURL, &apiResponse)
-		if err != nil {
-			log.Printf("Error fetching players from %s: %v", apiURL, err)
-			continue
-		}
+			var apiResponse struct {
+				Results []models.PlayerAPI `json:"results"`
+			}
+			err := FetchAndParseAPI(apiURL, &apiResponse)
+			if err != nil {
+				log.Printf("Error fetching players from %s: %v", apiURL, err)
+				break
+			}
 
-		for _, apiPlayer := range apiResponse.Results {
+			// stop when API returns no results
+			if len(apiResponse.Results) == 0 {
+				log.Printf("No players on page %d for league %s, stopping pagination", page, league.Name)
+				break
+			}
+
+			for _, apiPlayer := range apiResponse.Results {
 			// ดาวน์โหลดรูปภาพผู้เล่น
 			photoPath := ""
 			if apiPlayer.Photo != "" {
@@ -96,6 +106,9 @@ func ScrapePlayers(db *sql.DB) error {
 			if err != nil {
 				log.Printf("Error saving player %s to DB: %v", apiPlayer.FullName, err)
 			}
+		}
+			// be polite between pages — wait 10 seconds before next page
+			time.Sleep(10 * time.Second)
 		}
 	}
 	return nil
