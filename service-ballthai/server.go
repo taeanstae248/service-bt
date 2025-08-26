@@ -52,6 +52,16 @@ func main() {
 	   defer resp.Body.Close()
 	   log.Println("cron fetch /scraper/standing status:", resp.Status)
    })
+   // Fetch player data every 6 hours (at 00:00, 06:00, 12:00, 18:00)
+   c.AddFunc("0 */6 * * *", func() {
+	   resp, err := http.Get("https://svc.ballthai.com/scraper/player")
+	   if err != nil {
+		   log.Println("cron fetch error /scraper/player:", err)
+		   return
+	   }
+	   defer resp.Body.Close()
+	   log.Println("cron fetch /scraper/player status:", resp.Status)
+   })
    c.Start()
 	// ประกาศตัวแปร db และ err
 	var db *sql.DB
