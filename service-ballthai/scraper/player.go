@@ -17,6 +17,18 @@ func ScrapePlayers(db *sql.DB) error {
 		return err
 	}
 	for _, league := range leagues {
+		// Only scrape this fixed set of leagues (internal IDs). Update the map
+		// here when you need to change which leagues are scraped.
+		allowedLeagues := map[int]bool{
+			1: true, // ไทยลีก 1
+			2: true, // ไทยลีก 2
+			3: true, // ไทยลีก 3
+		}
+		if !allowedLeagues[league.ID] {
+			log.Printf("Skipping league: id=%d name=%s thaileageid=%v (not in allowed list)", league.ID, league.Name, league.ThaileageID)
+			continue
+		}
+
 		if !league.ThaileageID.Valid || league.ThaileageID.Int64 == 0 {
 			continue
 		}
