@@ -223,8 +223,9 @@ func GetTopScorers(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		query += " AND p.league_id = ?"
-		args = append(args, leagueID)
+	// filter by league: either players table or team's league (some rows may have league set on team)
+	query += " AND (p.league_id = ? OR t.league_id = ?)"
+	args = append(args, leagueID, leagueID)
 	}
 
 	query += " ORDER BY p.goals DESC LIMIT ?"
@@ -289,6 +290,7 @@ func GetTopScorers(w http.ResponseWriter, r *http.Request) {
 		// goals is used for ordering; if you want to include it in response we can extend Player struct
 		players = append(players, player)
 	}
+	log.Printf("GetTopScorers found %d players", len(players))
 
 	response := APIResponse{
 		Success: true,
