@@ -223,9 +223,9 @@ func GetTopScorers(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-	// filter by league: either players table or team's league (some rows may have league set on team)
-	query += " AND (p.league_id = ? OR t.league_id = ?)"
-	args = append(args, leagueID, leagueID)
+	// filter by league using players.league_id
+	query += " AND p.league_id = ?"
+	args = append(args, leagueID)
 	}
 
 	query += " ORDER BY p.goals DESC LIMIT ?"
