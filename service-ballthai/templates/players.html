@@ -110,6 +110,15 @@
                 {{end}}
             </tbody>
         </table>
+        <div style="display:flex; justify-content:center; gap:1rem; margin:1rem 0;">
+            {{if .HasPrev}}
+            <a href="/players.html?page={{.PrevPage}}&page_size={{.PageSize}}{{if .TeamID}}&team_id={{.TeamID}}{{end}}{{if .Name}}&name={{.Name}}{{end}}" class="btn btn-secondary">&laquo; Prev</a>
+            {{end}}
+            <div style="align-self:center">หน้า {{.CurrentPage}} / {{.TotalPages}} ({{.TotalCount}})</div>
+            {{if .HasNext}}
+            <a href="/players.html?page={{.NextPage}}&page_size={{.PageSize}}{{if .TeamID}}&team_id={{.TeamID}}{{end}}{{if .Name}}&name={{.Name}}{{end}}" class="btn btn-secondary">Next &raquo;</a>
+            {{end}}
+        </div>
     </div>
     <script>
         function scrapePlayers() {

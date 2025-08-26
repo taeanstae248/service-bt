@@ -9,6 +9,7 @@ import (
 	"html/template"
 	"strings"
 	"os"
+	"strconv"
 	"github.com/robfig/cron/v3"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -154,6 +155,21 @@ func main() {
 		// Filter by team_id and name if present
 		teamID := r.URL.Query().Get("team_id")
 		name := r.URL.Query().Get("name")
+		pageStr := r.URL.Query().Get("page")
+		pageSizeStr := r.URL.Query().Get("page_size")
+		page := 1
+		pageSize := 50
+		if pageStr != "" {
+			if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+				page = p
+			}
+		}
+		if pageSizeStr != "" {
+			if ps, err := strconv.Atoi(pageSizeStr); err == nil && ps > 0 && ps <= 500 {
+				pageSize = ps
+			}
+		}
+
 		baseQuery := `SELECT p.id, p.name, p.full_name_en, p.shirt_number, p.position, p.photo_url, p.matches_played, p.goals, p.yellow_cards, p.red_cards, p.status, t.name_th as team_name FROM players p LEFT JOIN teams t ON p.team_id = t.id`
 		var where []string
 		var args []interface{}
@@ -165,17 +181,29 @@ func main() {
 			where = append(where, "p.name LIKE ?")
 			args = append(args, "%"+name+"%")
 		}
+
+		// Count total
+		countQuery := "SELECT COUNT(*) FROM players p LEFT JOIN teams t ON p.team_id = t.id"
+		if len(where) > 0 {
+			countQuery += " WHERE " + strings.Join(where, " AND ")
+		}
+		var totalCount int
+		if err := db.QueryRow(countQuery, args...).Scan(&totalCount); err != nil {
+			log.Printf("Count query error in /players.html: %v", err)
+			http.Error(w, "Query error: "+err.Error(), 500)
+			return
+		}
+
 		query := baseQuery
 		if len(where) > 0 {
 			query += " WHERE " + strings.Join(where, " AND ")
 		}
-		rows, err := db.Query(query, args...)
-		if err != nil {
-			log.Printf("Query error in /players.html: %v", err)
-			http.Error(w, "Query error: "+err.Error(), 500)
-			return
-		}
-		defer rows.Close()
+
+		// pagination
+		offset := (page - 1) * pageSize
+		query += " ORDER BY p.shirt_number, p.name LIMIT ? OFFSET ?"
+		args = append(args, pageSize, offset)
+
 		type Player struct {
 			ID            int
 			Name          string
@@ -190,6 +218,15 @@ func main() {
 			Status        int
 			TeamName      string
 		}
+
+		rows, err := db.Query(query, args...)
+		if err != nil {
+			log.Printf("Query error in /players.html: %v", err)
+			http.Error(w, "Query error: "+err.Error(), 500)
+			return
+		}
+		defer rows.Close()
+
 		var players []Player
 		for rows.Next() {
 			var p Player
@@ -206,12 +243,47 @@ func main() {
 			p.TeamName = teamName.String
 			players = append(players, p)
 		}
+
+		// prepare paging metadata
+		totalPages := 1
+		if totalCount > 0 {
+			totalPages = (totalCount + pageSize - 1) / pageSize
+		}
+		hasPrev := page > 1
+		hasNext := page < totalPages
+		prevPage := page - 1
+		nextPage := page + 1
+
 		tmpl, err := template.ParseFiles("templates/players.html", "templates/_nav.html")
 		if err != nil {
 			http.Error(w, "Template error", 500)
 			return
 		}
-		data := struct{ Players []Player }{Players: players}
+		data := struct{
+			Players []Player
+			CurrentPage int
+			PageSize int
+			TotalPages int
+			TotalCount int
+			HasPrev bool
+			HasNext bool
+			PrevPage int
+			NextPage int
+			TeamID string
+			Name string
+		}{
+			Players: players,
+			CurrentPage: page,
+			PageSize: pageSize,
+			TotalPages: totalPages,
+			TotalCount: totalCount,
+			HasPrev: hasPrev,
+			HasNext: hasNext,
+			PrevPage: prevPage,
+			NextPage: nextPage,
+			TeamID: teamID,
+			Name: name,
+		}
 		tmpl.Execute(w, data)
 	})))
 
