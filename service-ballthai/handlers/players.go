@@ -208,7 +208,7 @@ func GetTopScorers(w http.ResponseWriter, r *http.Request) {
 			// Support alias strings (e.g., "t1" -> 1). Add more mappings as needed.
 			aliasMap := map[string]int{
 				"t1": 1,
-				"t1-jpy": 60,
+				"t2": 2,
 			}
 			if mapped, ok := aliasMap[leagueIDStr]; ok {
 				leagueID = mapped
