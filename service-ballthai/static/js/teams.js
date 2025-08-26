@@ -126,7 +126,7 @@ function renderTeams(teamsToRender) {
         // รองรับ field หลายแบบจาก backend
         const teamName = team.name_th || team.name_en || team.name || team.team_name || 'undefined';
         // รองรับ field โลโก้หลายแบบ
-        let logoSrc = '/static/img/default-logo.png';
+        let logoSrc = '';
         if (team.logo_url) {
             logoSrc = team.logo_url;
         } else if (team.logo) {
@@ -139,8 +139,8 @@ function renderTeams(teamsToRender) {
         return `
         <div class="team-card" data-team-id="${team.id}">
             <div class="team-header">
-                <img src="${logoSrc}" alt="${teamName}" class="team-logo" onerror="this.src='/static/img/default-logo.png';">
-                <div class="team-logo-placeholder" ${(logoSrc && logoSrc !== '/static/img/default-logo.png') ? 'style="display:none"' : ''}>⚽</div>
+            ${logoSrc ? `<img src="${logoSrc}" alt="${teamName}" class="team-logo" onerror="this.style.display='none';">` : ''}
+                <div class="team-logo-placeholder" ${logoSrc ? 'style="display:none"' : ''}>⚽</div>
                 <div class="team-info">
                     <h3>${teamName}</h3>
                     <p>สนาม: ${team.stadium_name || 'ไม่ระบุ'}</p>
@@ -223,8 +223,7 @@ async function saveTeam() {
     const formData = {
         name: document.getElementById('teamName').value,
         stadium_id: document.getElementById('teamStadium').value || null,
-        team_post_id: document.getElementById('teamPostId').value || null,
-        logo_url: document.getElementById('teamLogoUrl').value || ''
+        team_post_id: document.getElementById('teamPostId').value || null
     };
 
     if (!formData.name) {
@@ -271,7 +270,7 @@ function editTeam(teamId) {
     document.getElementById('teamName').value = team.name;
     document.getElementById('teamStadium').value = team.stadium_id || '';
     document.getElementById('teamPostId').value = team.team_post_id || '';
-    document.getElementById('teamLogoUrl').value = team.logo || '';
+    // removed teamLogoUrl field
     document.getElementById('teamModal').style.display = 'block';
 }
 
