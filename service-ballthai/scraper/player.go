@@ -42,6 +42,10 @@ func ScrapePlayers(db *sql.DB) error {
 			}
 
 			for _, apiPlayer := range apiResponse.Results {
+				// Debug: log raw nationality info from API for troubleshooting (include both possible fields)
+				if apiPlayer.Nationality.Code != "" || apiPlayer.Nationality.FullName != "" || apiPlayer.Nationality.Name != "" {
+					log.Printf("API nationality raw: player=%s code='%s' full_name='%s' name='%s'", apiPlayer.FullName, apiPlayer.Nationality.Code, apiPlayer.Nationality.FullName, apiPlayer.Nationality.Name)
+				}
 			// ดาวน์โหลดรูปภาพผู้เล่น
 			photoPath := ""
 			if apiPlayer.Photo != "" {
@@ -53,11 +57,15 @@ func ScrapePlayers(db *sql.DB) error {
 				}
 			}
 
-			// รับ Nationality ID: try by code first, then name. Call helper if we have either.
+			// รับ Nationality ID: use either code or name from API. Some APIs use `name`, others `full_name`.
 			nationalityID := sql.NullInt64{Valid: false}
-			if apiPlayer.Nationality.Code != "" || apiPlayer.Nationality.FullName != "" {
+			if apiPlayer.Nationality.Code != "" || apiPlayer.Nationality.FullName != "" || apiPlayer.Nationality.Name != "" {
 				code := apiPlayer.Nationality.Code
+				// prefer full_name but fall back to name when full_name is empty
 				name := apiPlayer.Nationality.FullName
+				if name == "" {
+					name = apiPlayer.Nationality.Name
+				}
 				nID, err := database.GetNationalityID(db, code, name)
 				if err != nil {
 					log.Printf("Warning: Failed to get nationality ID for code='%s' name='%s': %v", code, name, err)

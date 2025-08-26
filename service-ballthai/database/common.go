@@ -10,29 +10,33 @@ import (
 func GetNationalityID(db *sql.DB, code, name string) (int, error) {
 	var nationalityID int
 
-	// If code is provided, try lookup by code first
+	// Prefer lookup by name when a name is provided. Names are generally
+	// more specific than a short code returned by some APIs, and some APIs
+	// unfortunately return the same code for many players.
+	if name != "" {
+		queryByName := "SELECT id FROM nationalities WHERE REPLACE(name, ' ', '') = REPLACE(?, ' ', '')"
+		err := db.QueryRow(queryByName, name).Scan(&nationalityID)
+		if err == nil {
+			log.Printf("Found existing nationality by name: %s (ID: %d)", name, nationalityID)
+			return nationalityID, nil
+		}
+		if err != sql.ErrNoRows {
+			return 0, fmt.Errorf("failed to query nationality by name %s: %w", name, err)
+		}
+		// not found by name, fallthrough to try code (if present)
+	}
+
+	// If code is provided, try lookup by code next
 	if code != "" {
 		query := "SELECT id FROM nationalities WHERE code = ?"
 		err := db.QueryRow(query, code).Scan(&nationalityID)
 		if err == nil {
-			log.Printf("Found existing nationality by code: %s (ID: %d)", name, nationalityID)
+			log.Printf("Found existing nationality by code: %s (code=%s ID=%d)", name, code, nationalityID)
 			return nationalityID, nil
 		}
 		if err != sql.ErrNoRows {
 			return 0, fmt.Errorf("failed to query nationality by code %s: %w", code, err)
 		}
-		// fallthrough to try lookup by name
-	}
-
-	// Try lookup by name (case/space-insensitive)
-	queryByName := "SELECT id FROM nationalities WHERE REPLACE(name, ' ', '') = REPLACE(?, ' ', '')"
-	err := db.QueryRow(queryByName, name).Scan(&nationalityID)
-	if err == nil {
-		log.Printf("Found existing nationality by name: %s (ID: %d)", name, nationalityID)
-		return nationalityID, nil
-	}
-	if err != sql.ErrNoRows {
-		return 0, fmt.Errorf("failed to query nationality by name %s: %w", name, err)
 	}
 
 	// Insert new nationality. If code is empty, insert NULL for code.
@@ -49,7 +53,7 @@ func GetNationalityID(db *sql.DB, code, name string) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("failed to get last insert ID for nationality %s: %w", name, err)
 	}
-	log.Printf("Inserted new nationality: %s (ID: %d)", name, newID)
+	log.Printf("Inserted new nationality: %s (ID: %d) code=%v", name, newID, codeVal)
 	return int(newID), nil
 }
 
