@@ -145,6 +145,8 @@ func GetPlayers(w http.ResponseWriter, r *http.Request) {
 	query += " ORDER BY p.name LIMIT ? OFFSET ?"
 	args = append(args, limit, offset)
 
+	// Debug: log final query and args to help diagnose empty results
+	log.Printf("GetTopScorers query: %s | args: %v", query, args)
 	rows, err := DB.Query(query, args...)
 	if err != nil {
 		log.Printf("Database error in GetPlayers: %v", err)
