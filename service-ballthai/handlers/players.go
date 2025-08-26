@@ -155,7 +155,7 @@ func GetPlayers(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	var players []Player
+	players := make([]Player, 0)
 	for rows.Next() {
 		var player Player
 		if err := rows.Scan(&player.ID, &player.Name, &player.Position, &player.ShirtNumber,
