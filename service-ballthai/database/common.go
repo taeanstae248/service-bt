@@ -9,27 +9,48 @@ import (
 // GetNationalityID checks if nationality exists by code, inserts if not, and returns ID
 func GetNationalityID(db *sql.DB, code, name string) (int, error) {
 	var nationalityID int
-	query := "SELECT id FROM nationalities WHERE code = ?"
-	err := db.QueryRow(query, code).Scan(&nationalityID)
 
-	if err == sql.ErrNoRows {
-		// Insert new nationality
-		insertQuery := `INSERT INTO nationalities (code, name) VALUES (?, ?)`
-		result, err := db.Exec(insertQuery, code, name)
-		if err != nil {
-			return 0, fmt.Errorf("failed to insert new nationality %s: %w", name, err)
+	// If code is provided, try lookup by code first
+	if code != "" {
+		query := "SELECT id FROM nationalities WHERE code = ?"
+		err := db.QueryRow(query, code).Scan(&nationalityID)
+		if err == nil {
+			log.Printf("Found existing nationality by code: %s (ID: %d)", name, nationalityID)
+			return nationalityID, nil
 		}
-		newID, err := result.LastInsertId()
-		if err != nil {
-			return 0, fmt.Errorf("failed to get last insert ID for nationality %s: %w", name, err)
+		if err != sql.ErrNoRows {
+			return 0, fmt.Errorf("failed to query nationality by code %s: %w", code, err)
 		}
-		log.Printf("Inserted new nationality: %s (ID: %d)", name, newID)
-		return int(newID), nil
-	} else if err != nil {
-		return 0, fmt.Errorf("failed to query nationality by code %s: %w", code, err)
+		// fallthrough to try lookup by name
 	}
-	log.Printf("Found existing nationality: %s (ID: %d)", name, nationalityID)
-	return nationalityID, nil
+
+	// Try lookup by name (case/space-insensitive)
+	queryByName := "SELECT id FROM nationalities WHERE REPLACE(name, ' ', '') = REPLACE(?, ' ', '')"
+	err := db.QueryRow(queryByName, name).Scan(&nationalityID)
+	if err == nil {
+		log.Printf("Found existing nationality by name: %s (ID: %d)", name, nationalityID)
+		return nationalityID, nil
+	}
+	if err != sql.ErrNoRows {
+		return 0, fmt.Errorf("failed to query nationality by name %s: %w", name, err)
+	}
+
+	// Insert new nationality. If code is empty, insert NULL for code.
+	var codeVal interface{} = nil
+	if code != "" {
+		codeVal = code
+	}
+	insertQuery := `INSERT INTO nationalities (code, name) VALUES (?, ?)`
+	result, err := db.Exec(insertQuery, codeVal, name)
+	if err != nil {
+		return 0, fmt.Errorf("failed to insert new nationality %s: %w", name, err)
+	}
+	newID, err := result.LastInsertId()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get last insert ID for nationality %s: %w", name, err)
+	}
+	log.Printf("Inserted new nationality: %s (ID: %d)", name, newID)
+	return int(newID), nil
 }
 
 // GetChannelID checks if channel exists by name, inserts if not, and returns ID

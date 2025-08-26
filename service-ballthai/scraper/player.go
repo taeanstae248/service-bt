@@ -53,14 +53,17 @@ func ScrapePlayers(db *sql.DB) error {
 				}
 			}
 
-			// รับ Nationality ID
+			// รับ Nationality ID: try by code first, then name. Call helper if we have either.
 			nationalityID := sql.NullInt64{Valid: false}
-			if apiPlayer.Nationality.Code != "" {
-				nID, err := database.GetNationalityID(db, apiPlayer.Nationality.Code, apiPlayer.Nationality.FullName)
+			if apiPlayer.Nationality.Code != "" || apiPlayer.Nationality.FullName != "" {
+				code := apiPlayer.Nationality.Code
+				name := apiPlayer.Nationality.FullName
+				nID, err := database.GetNationalityID(db, code, name)
 				if err != nil {
-					log.Printf("Warning: Failed to get nationality ID for %s: %v", apiPlayer.Nationality.FullName, err)
+					log.Printf("Warning: Failed to get nationality ID for code='%s' name='%s': %v", code, name, err)
 				} else {
 					nationalityID = sql.NullInt64{Int64: int64(nID), Valid: true}
+					log.Printf("Nationality resolved: code='%s' name='%s' -> id=%d", code, name, nID)
 				}
 			}
 

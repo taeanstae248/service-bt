@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS `channels` (
 CREATE TABLE IF NOT EXISTS `nationalities` (
     `id` INT PRIMARY KEY AUTO_INCREMENT,
     `code` VARCHAR(10) UNIQUE,           -- รหัสสัญชาติ (เช่น TH, EN)
-    `name` VARCHAR(255) NOT NULL UNIQUE, -- ชื่อสัญชาติ (เช่น ไทย, อังกฤษ)
+    `name` VARCHAR(255) , -- ชื่อสัญชาติ (เช่น ไทย, อังกฤษ)
     `flag_url` VARCHAR(255)              -- URL รูปภาพธงชาติ
 );
 
