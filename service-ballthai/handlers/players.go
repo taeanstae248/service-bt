@@ -200,6 +200,10 @@ func GetTopScorers(w http.ResponseWriter, r *http.Request) {
 	`
 
 	var args []interface{}
+
+	// Always only include players with goals > 0
+	query += " WHERE p.goals > 0"
+
 	if leagueIDStr != "" {
 		var leagueID int
 		if id, err := strconv.Atoi(leagueIDStr); err == nil {
@@ -217,7 +221,7 @@ func GetTopScorers(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		query += " WHERE p.league_id = ?"
+		query += " AND p.league_id = ?"
 		args = append(args, leagueID)
 	}
 
