@@ -29,7 +29,24 @@ func CreateTeam(w http.ResponseWriter, r *http.Request) {
 		LogoURL    string `json:"logo_url"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&team); err != nil {
+	// Read raw body for debugging and decoding
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.Printf("Error reading request body: %v", err)
+		http.Error(w, `{"success": false, "error": "Failed to read request body"}`, http.StatusBadRequest)
+		return
+	}
+
+	if len(bodyBytes) == 0 {
+		http.Error(w, `{"success": false, "error": "Empty request body"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Log the incoming body for debugging (label for CreateTeam fixed earlier)
+	log.Printf("CreateTeam request body: %s", string(bodyBytes))
+
+	if err := json.Unmarshal(bodyBytes, &team); err != nil {
+		log.Printf("JSON unmarshal error in CreateTeam: %v; body: %s", err, string(bodyBytes))
 		http.Error(w, `{"success": false, "error": "Invalid request body"}`, http.StatusBadRequest)
 		return
 	}
@@ -81,32 +98,111 @@ func UpdateTeam(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var team struct {
-		Name       string `json:"name"`
-		NameTh     string `json:"name_th"`
-		StadiumID  *int   `json:"stadium_id"`
-		TeamPostID *int   `json:"team_post_id"`
-		LogoURL    string `json:"logo_url"`
+	// New implementation: accept number/string/null for numeric fields and build dynamic UPDATE
+	var raw struct {
+		Name       *string          `json:"name"`
+		NameTh     *string          `json:"name_th"`
+		StadiumRaw *json.RawMessage `json:"stadium_id"`
+		TeamPostRaw *json.RawMessage `json:"team_post_id"`
+		LogoURL    *string          `json:"logo_url"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&team); err != nil {
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.Printf("UpdateTeam: read body error: %v", err)
+		http.Error(w, `{"success": false, "error": "Failed to read request body"}`, http.StatusBadRequest)
+		return
+	}
+	if len(bodyBytes) == 0 {
+		http.Error(w, `{"success": false, "error": "Empty request body"}`, http.StatusBadRequest)
+		return
+	}
+	log.Printf("UpdateTeam request body: %s", string(bodyBytes))
+
+	if err := json.Unmarshal(bodyBytes, &raw); err != nil {
+		log.Printf("JSON unmarshal error in UpdateTeam: %v; body: %s", err, string(bodyBytes))
 		http.Error(w, `{"success": false, "error": "Invalid request body"}`, http.StatusBadRequest)
 		return
 	}
 
-	// Normalize logo URL before saving
-	normalizedLogo := team.LogoURL
-	if team.LogoURL != "" {
-		normalizedLogo = database.NormalizeLogoURL(team.LogoURL)
+	// helper to parse optional int from raw JSON that may be number, string, or null
+	parseOptionalInt := func(raw *json.RawMessage) (*int, error) {
+		if raw == nil {
+			return nil, nil
+		}
+		if string(*raw) == "null" {
+			return nil, nil
+		}
+		var n int
+		if err := json.Unmarshal(*raw, &n); err == nil {
+			return &n, nil
+		}
+		var s string
+		if err := json.Unmarshal(*raw, &s); err == nil {
+			s = strings.TrimSpace(s)
+			if s == "" {
+				return nil, nil
+			}
+			v, err := strconv.Atoi(s)
+			if err != nil {
+				return nil, err
+			}
+			return &v, nil
+		}
+		return nil, fmt.Errorf("unsupported value for int field: %s", string(*raw))
 	}
 
-	query := `
-		UPDATE teams 
-		SET name_th = ?, stadium_id = ?, team_post_ballthai = ?, logo_url = ?
-		WHERE id = ?
-	`
+	stadiumID, err := parseOptionalInt(raw.StadiumRaw)
+	if err != nil {
+		log.Printf("Invalid stadium_id value: %v", err)
+		http.Error(w, `{"success": false, "error": "Invalid stadium_id"}`, http.StatusBadRequest)
+		return
+	}
+	teamPostID, err := parseOptionalInt(raw.TeamPostRaw)
+	if err != nil {
+		log.Printf("Invalid team_post_id value: %v", err)
+		http.Error(w, `{"success": false, "error": "Invalid team_post_id"}`, http.StatusBadRequest)
+		return
+	}
 
-	_, err = DB.Exec(query, team.NameTh, team.StadiumID, team.TeamPostID, normalizedLogo, teamID)
+	var setParts []string
+	var args []interface{}
+
+	if raw.NameTh != nil {
+		setParts = append(setParts, "name_th = ?")
+		args = append(args, *raw.NameTh)
+	} else if raw.Name != nil {
+		setParts = append(setParts, "name_th = ?")
+		args = append(args, *raw.Name)
+	}
+	if stadiumID != nil {
+		setParts = append(setParts, "stadium_id = ?")
+		args = append(args, stadiumID)
+	}
+	if teamPostID != nil {
+		setParts = append(setParts, "team_post_ballthai = ?")
+		args = append(args, teamPostID)
+	}
+	if raw.LogoURL != nil {
+		if *raw.LogoURL != "" {
+			normalized := database.NormalizeLogoURL(*raw.LogoURL)
+			setParts = append(setParts, "logo_url = ?")
+			args = append(args, normalized)
+		} else {
+			setParts = append(setParts, "logo_url = NULL")
+		}
+	}
+
+	if len(setParts) == 0 {
+		response := APIResponse{Success: true, Data: map[string]string{"message": "No changes"}}
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	query := fmt.Sprintf("UPDATE teams SET %s WHERE id = ?", strings.Join(setParts, ", "))
+	args = append(args, teamID)
+
+	_, err = DB.Exec(query, args...)
 	if err != nil {
 		log.Printf("Error updating team: %v", err)
 		http.Error(w, `{"success": false, "error": "Failed to update team"}`, http.StatusInternalServerError)
