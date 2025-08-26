@@ -201,13 +201,24 @@ func GetTopScorers(w http.ResponseWriter, r *http.Request) {
 
 	var args []interface{}
 	if leagueIDStr != "" {
-		if leagueID, err := strconv.Atoi(leagueIDStr); err == nil {
-			query += " WHERE p.league_id = ?"
-			args = append(args, leagueID)
+		var leagueID int
+		if id, err := strconv.Atoi(leagueIDStr); err == nil {
+			leagueID = id
 		} else {
-			http.Error(w, "Invalid league_id parameter", http.StatusBadRequest)
-			return
+			// Support alias strings (e.g., "t1" -> 1). Add more mappings as needed.
+			aliasMap := map[string]int{
+				"t1": 1,
+				"t1-jpy": 60,
+			}
+			if mapped, ok := aliasMap[leagueIDStr]; ok {
+				leagueID = mapped
+			} else {
+				http.Error(w, "Invalid league_id parameter", http.StatusBadRequest)
+				return
+			}
 		}
+		query += " WHERE p.league_id = ?"
+		args = append(args, leagueID)
 	}
 
 	query += " ORDER BY p.goals DESC LIMIT ?"
