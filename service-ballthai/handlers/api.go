@@ -84,6 +84,10 @@ type Player struct {
 	TeamID        *int    `json:"team_id,omitempty"`
 	TeamName      *string `json:"team_name,omitempty"`
 	TeamPostID    *int    `json:"team_post_id,omitempty"`
+	MatchesPlayed *int    `json:"matches_played,omitempty"`
+	YellowCards   *int    `json:"yellow_cards,omitempty"`
+	RedCards      *int    `json:"red_cards,omitempty"`
+	Status        *int    `json:"status,omitempty"`
 	Age           *int    `json:"age,omitempty"`
 	Height        *string `json:"height,omitempty"`
 	Weight        *string `json:"weight,omitempty"`
@@ -400,11 +404,20 @@ func GetTeams(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// Players (by resolved team ID). Use p.team_id = teamID.
-		playersQuery := `SELECT p.id, p.name, p.position, p.shirt_number, p.team_id, t.name_th as team_name, t.team_post_ballthai as team_post_id, p.photo_url, p.matches_played, p.goals, p.yellow_cards, p.red_cards, p.status, n.name as nationality, p.player_ref_id as player_post_id FROM players p LEFT JOIN teams t ON p.team_id = t.id LEFT JOIN nationalities n ON p.nationality_id = n.id WHERE p.team_id = ? ORDER BY p.shirt_number, p.name`
+		// Players (by resolved team ID). Select only columns that exist in schema.
+		playersQuery := `SELECT p.id, p.name, p.position, p.shirt_number, p.team_id, t.name_th as team_name, t.team_post_ballthai as team_post_id,
+			   p.photo_url, p.matches_played, p.goals, p.yellow_cards, p.red_cards, p.status,
+			   n.code as nationality, p.player_ref_id as player_post_id
+			FROM players p
+			LEFT JOIN teams t ON p.team_id = t.id
+			LEFT JOIN nationalities n ON p.nationality_id = n.id
+			WHERE p.team_id = ? ORDER BY p.shirt_number, p.name`
+		players := make([]Player, 0)
 		prow, err := DB.Query(playersQuery, teamID)
-		var players []Player
-		if err == nil {
+		if err != nil {
+			// Log DB error and keep players as empty slice so JSON encodes [] instead of null
+			fmt.Printf("GetTeams: players query error for team_post=%s teamID=%d: %v\n", teamPost, teamID, err)
+		} else {
 			defer prow.Close()
 			for prow.Next() {
 				var pl Player
@@ -422,17 +435,22 @@ func GetTeams(w http.ResponseWriter, r *http.Request) {
 				var nat sql.NullString
 				var playerPost sql.NullInt64
 
-				if err := prow.Scan(&pl.ID, &pl.Name, &pos, &shirt, &teamIDsql, &teamName, &teamPost, &photo, &matchesPlayed, &goals, &yellow, &red, &status, &nat, &playerPost); err == nil {
+				if err := prow.Scan(&pl.ID, &pl.Name, &pos, &shirt, &teamIDsql, &teamName, &teamPost,
+					&photo, &matchesPlayed, &goals, &yellow, &red, &status,
+					&nat, &playerPost); err == nil {
 					if pos.Valid { p := pos.String; pl.Position = &p }
 					if shirt.Valid { v := int(shirt.Int64); pl.ShirtNumber = &v }
 					if teamIDsql.Valid { v := int(teamIDsql.Int64); pl.TeamID = &v }
 					if teamName.Valid { s := teamName.String; pl.TeamName = &s }
 					if teamPost.Valid { if tp, err := strconv.Atoi(teamPost.String); err == nil { pl.TeamPostID = &tp } }
 					if goals.Valid { v := int(goals.Int64); pl.Goals = &v }
+					if matchesPlayed.Valid { v := int(matchesPlayed.Int64); pl.MatchesPlayed = &v }
+					if yellow.Valid { v := int(yellow.Int64); pl.YellowCards = &v }
+					if red.Valid { v := int(red.Int64); pl.RedCards = &v }
+					if status.Valid { v := int(status.Int64); pl.Status = &v }
 					if nat.Valid { s := nat.String; pl.Nationality = &s }
 					if playerPost.Valid { v := int(playerPost.Int64); pl.PlayerPostID = &v }
 					if photo.Valid { s := photo.String; pl.ProfileImage = &s }
-					if matchesPlayed.Valid { /* ignore or map if needed */ }
 					players = append(players, pl)
 				}
 			}

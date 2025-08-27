@@ -104,7 +104,7 @@ func GetPlayers(w http.ResponseWriter, r *http.Request) {
 	baseQuery := `
 		SELECT p.id, p.name, p.position, p.shirt_number, p.team_id, t.name_th as team_name,
 			   t.team_post_ballthai as team_post_id, p.photo_url, p.matches_played, p.goals,
-			   p.yellow_cards, p.red_cards, p.status, n.name as nationality, p.player_ref_id as player_post_id
+			   p.yellow_cards, p.red_cards, p.status, n.code as nationality, p.player_ref_id as player_post_id
 		FROM players p
 		LEFT JOIN teams t ON p.team_id = t.id
 		LEFT JOIN nationalities n ON p.nationality_id = n.id
@@ -216,7 +216,7 @@ func GetTopScorers(w http.ResponseWriter, r *http.Request) {
 
 	query := `
 		SELECT p.id, p.name, p.position, p.shirt_number, p.team_id, t.name_th as team_name,
-			   t.team_post_ballthai as team_post_id, n.name as nationality,
+			   t.team_post_ballthai as team_post_id, n.code as nationality,
 			   p.photo_url, p.goals
 		FROM players p
 		LEFT JOIN teams t ON p.team_id = t.id
@@ -335,7 +335,7 @@ func GetPlayersByTeamID(w http.ResponseWriter, r *http.Request) {
 	query := `
 		SELECT p.id, p.name, p.position, p.shirt_number, p.team_id, t.name_th as team_name,
 			   t.team_post_ballthai as team_post_id, p.photo_url, p.matches_played, p.goals,
-			   p.yellow_cards, p.red_cards, p.status, n.name as nationality, p.player_ref_id as player_post_id
+			   p.yellow_cards, p.red_cards, p.status, n.code as nationality, p.player_ref_id as player_post_id
 		FROM players p
 		LEFT JOIN teams t ON p.team_id = t.id
 		LEFT JOIN nationalities n ON p.nationality_id = n.id
