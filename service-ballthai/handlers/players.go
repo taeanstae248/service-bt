@@ -100,12 +100,11 @@ func GetPlayers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build query with optional filters
+	// Select only columns that exist in the schema. Avoid referencing p.age, p.height, etc.
 	baseQuery := `
 		SELECT p.id, p.name, p.position, p.shirt_number, p.team_id, t.name_th as team_name,
-		       t.team_post_ballthai as team_post_id, p.age, p.height, p.weight,
-		       n.name as nationality, p.player_post_ballthai as player_post_id,
-		       p.profile_image_url, p.date_of_birth, p.place_of_birth,
-		       p.career_start, p.preferred_foot
+			   t.team_post_ballthai as team_post_id, p.photo_url, p.matches_played, p.goals,
+			   p.yellow_cards, p.red_cards, p.status, n.name as nationality, p.player_ref_id as player_post_id
 		FROM players p
 		LEFT JOIN teams t ON p.team_id = t.id
 		LEFT JOIN nationalities n ON p.nationality_id = n.id
@@ -158,15 +157,38 @@ func GetPlayers(w http.ResponseWriter, r *http.Request) {
 	players := make([]Player, 0)
 	for rows.Next() {
 		var player Player
-		if err := rows.Scan(&player.ID, &player.Name, &player.Position, &player.ShirtNumber,
-			&player.TeamID, &player.TeamName, &player.TeamPostID, &player.Age,
-			&player.Height, &player.Weight, &player.Nationality, &player.PlayerPostID,
-			&player.ProfileImage, &player.DateOfBirth, &player.PlaceOfBirth,
-			&player.CareerStart, &player.PreferredFoot); err != nil {
+		var pos sql.NullString
+		var shirt sql.NullInt64
+		var teamID sql.NullInt64
+		var teamName sql.NullString
+		var teamPost sql.NullString
+		var photo sql.NullString
+		var matchesPlayed sql.NullInt64
+		var goals sql.NullInt64
+		var yellow sql.NullInt64
+		var red sql.NullInt64
+		var status sql.NullInt64
+		var nationality sql.NullString
+		var playerPost sql.NullInt64
+
+		if err := rows.Scan(&player.ID, &player.Name, &pos, &shirt, &teamID, &teamName, &teamPost, &photo, &matchesPlayed, &goals, &yellow, &red, &status, &nationality, &playerPost); err != nil {
 			log.Printf("Scan error in GetPlayers: %v", err)
 			http.Error(w, fmt.Sprintf("Scan error: %v", err), http.StatusInternalServerError)
 			return
 		}
+		if pos.Valid { p := pos.String; player.Position = &p }
+		if shirt.Valid { v := int(shirt.Int64); player.ShirtNumber = &v }
+		if teamID.Valid { v := int(teamID.Int64); player.TeamID = &v }
+		if teamName.Valid { s := teamName.String; player.TeamName = &s }
+		if teamPost.Valid { if tp, err := strconv.Atoi(teamPost.String); err == nil { player.TeamPostID = &tp } }
+		if photo.Valid { s := photo.String; player.ProfileImage = &s }
+		if matchesPlayed.Valid { v := int(matchesPlayed.Int64); /* not stored in struct currently */ _ = v }
+		if goals.Valid { v := int(goals.Int64); player.Goals = &v }
+		if yellow.Valid { v := int(yellow.Int64); /* optional */ _ = v }
+		if red.Valid { v := int(red.Int64); /* optional */ _ = v }
+		if nationality.Valid { s := nationality.String; player.Nationality = &s }
+		if playerPost.Valid { v := int(playerPost.Int64); player.PlayerPostID = &v }
+
 		players = append(players, player)
 	}
 
@@ -312,10 +334,8 @@ func GetPlayersByTeamID(w http.ResponseWriter, r *http.Request) {
 
 	query := `
 		SELECT p.id, p.name, p.position, p.shirt_number, p.team_id, t.name_th as team_name,
-		       t.team_post_ballthai as team_post_id, p.age, p.height, p.weight,
-		       n.name as nationality, p.player_post_ballthai as player_post_id,
-		       p.profile_image_url, p.date_of_birth, p.place_of_birth,
-		       p.career_start, p.preferred_foot
+			   t.team_post_ballthai as team_post_id, p.photo_url, p.matches_played, p.goals,
+			   p.yellow_cards, p.red_cards, p.status, n.name as nationality, p.player_ref_id as player_post_id
 		FROM players p
 		LEFT JOIN teams t ON p.team_id = t.id
 		LEFT JOIN nationalities n ON p.nationality_id = n.id
@@ -367,10 +387,8 @@ func GetPlayersByTeamPost(w http.ResponseWriter, r *http.Request) {
 
 	query := `
 		SELECT p.id, p.name, p.position, p.shirt_number, p.team_id, t.name_th as team_name,
-		       t.team_post_ballthai as team_post_id, p.age, p.height, p.weight,
-		       n.name as nationality, p.player_post_ballthai as player_post_id,
-		       p.profile_image_url, p.date_of_birth, p.place_of_birth,
-		       p.career_start, p.preferred_foot
+			   t.team_post_ballthai as team_post_id, p.photo_url, p.matches_played, p.goals,
+			   p.yellow_cards, p.red_cards, p.status, n.name as nationality, p.player_ref_id as player_post_id
 		FROM players p
 		LEFT JOIN teams t ON p.team_id = t.id
 		LEFT JOIN nationalities n ON p.nationality_id = n.id

@@ -258,9 +258,174 @@ func SetDB(database *sql.DB) {
 func GetTeams(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
+	// If caller asks for a specific team via team_post_ballthai, return
+	// an object containing the team, next upcoming match, past results, and players.
+	teamPost := r.URL.Query().Get("team_post_ballthai")
+	if teamPost != "" {
+		// Find team by team_post_ballthai
+		var teamID int
+		var teamName sql.NullString
+		var stadiumID sql.NullInt64
+		var stadiumName sql.NullString
+		var logo sql.NullString
+		row := DB.QueryRow(`SELECT id, name_th, stadium_id, (SELECT name FROM stadiums s WHERE s.id = t.stadium_id) as stadium_name, logo_url FROM teams t WHERE t.team_post_ballthai = ? LIMIT 1`, teamPost)
+		if err := row.Scan(&teamID, &teamName, &stadiumID, &stadiumName, &logo); err != nil {
+			http.Error(w, fmt.Sprintf("Team with team_post_ballthai=%s not found: %v", teamPost, err), http.StatusNotFound)
+			return
+		}
+
+		teamObj := map[string]interface{}{
+			"id":   teamID,
+			"name": teamName.String,
+		}
+		if stadiumID.Valid {
+			teamObj["stadium_id"] = int(stadiumID.Int64)
+		} else {
+			teamObj["stadium_id"] = nil
+		}
+		if stadiumName.Valid {
+			teamObj["stadium_name"] = stadiumName.String
+		}
+		if logo.Valid {
+			teamObj["logo_url"] = logo.String
+		}
+
+		// Next upcoming matches (up to 10 upcoming matches with start_date >= today)
+		var nextMatches []map[string]interface{}
+	// include team names and league name instead of numeric ids
+	nmQuery := `SELECT m.id, m.start_date, m.start_time, m.home_team_id, m.away_team_id, ht.name_th as home_team, at.name_th as away_team, m.home_score, m.away_score, m.match_status, l.name as league_name, m.stage_id, m.channel_id, m.live_channel_id FROM matches m LEFT JOIN teams ht ON m.home_team_id = ht.id LEFT JOIN teams at ON m.away_team_id = at.id LEFT JOIN leagues l ON m.league_id = l.id WHERE (m.home_team_id = ? OR m.away_team_id = ?) AND DATE(m.start_date) >= CURDATE() ORDER BY m.start_date ASC, m.start_time ASC LIMIT 10`
+		nrows, nerr := DB.Query(nmQuery, teamID, teamID)
+		if nerr == nil {
+			defer nrows.Close()
+			for nrows.Next() {
+				var nmID sql.NullInt64
+				var nmDate sql.NullString
+				var nmTime sql.NullString
+				var nmHome sql.NullInt64
+				var nmAway sql.NullInt64
+				var nmHomeName sql.NullString
+				var nmAwayName sql.NullString
+				var nmLeagueName sql.NullString
+				var nmHomeScore sql.NullInt64
+				var nmAwayScore sql.NullInt64
+				var nmStatus sql.NullString
+				var nmStage sql.NullInt64
+				var nmChannel sql.NullInt64
+				var nmLiveChannel sql.NullInt64
+				if err := nrows.Scan(&nmID, &nmDate, &nmTime, &nmHome, &nmAway, &nmHomeName, &nmAwayName, &nmHomeScore, &nmAwayScore, &nmStatus, &nmLeagueName, &nmStage, &nmChannel, &nmLiveChannel); err == nil {
+					hm := ""
+					am := ""
+					ln := ""
+					if nmHomeName.Valid { hm = nmHomeName.String }
+					if nmAwayName.Valid { am = nmAwayName.String }
+					if nmLeagueName.Valid { ln = nmLeagueName.String }
+					nextMatches = append(nextMatches, map[string]interface{}{
+						"id":           int(nmID.Int64),
+						"start_date":   nmDate.String,
+						"start_time":   nmTime.String,
+						"home_team":    hm,
+						"away_team":    am,
+						"home_score":   nilSafeInt(nmHomeScore),
+						"away_score":   nilSafeInt(nmAwayScore),
+						"match_status": nmStatus.String,
+						"league":       ln,
+						"stage_id":     nilSafeInt(nmStage),
+						"channel_id":   nilSafeInt(nmChannel),
+						"live_channel_id": nilSafeInt(nmLiveChannel),
+					})
+				}
+			}
+		}
+
+		// Past results (last 10 matches where date <= today)
+		// include team names and league name for past results
+		pastQuery := `SELECT m.id, m.start_date, m.start_time, m.home_team_id, m.away_team_id, ht.name_th as home_team, at.name_th as away_team, m.home_score, m.away_score, m.match_status, l.name as league_name FROM matches m LEFT JOIN teams ht ON m.home_team_id = ht.id LEFT JOIN teams at ON m.away_team_id = at.id LEFT JOIN leagues l ON m.league_id = l.id WHERE (m.home_team_id = ? OR m.away_team_id = ?) AND DATE(m.start_date) <= CURDATE() ORDER BY m.start_date DESC, m.start_time DESC LIMIT 10`
+		rows, err := DB.Query(pastQuery, teamID, teamID)
+		var past []map[string]interface{}
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var mid sql.NullInt64
+				var mdate, mtime, mstatus sql.NullString
+				var mhome, maway, mhscore, mascore sql.NullInt64
+				var mhomeName, mawayName, mLeagueName sql.NullString
+				if err := rows.Scan(&mid, &mdate, &mtime, &mhome, &maway, &mhomeName, &mawayName, &mhscore, &mascore, &mstatus, &mLeagueName); err == nil {
+					hm := ""
+					am := ""
+					ln := ""
+					if mhomeName.Valid { hm = mhomeName.String }
+					if mawayName.Valid { am = mawayName.String }
+					if mLeagueName.Valid { ln = mLeagueName.String }
+					past = append(past, map[string]interface{}{
+						"id":           int(mid.Int64),
+						"start_date":   mdate.String,
+						"start_time":   mtime.String,
+						"home_team":    hm,
+						"away_team":    am,
+						"home_score":   nilSafeInt(mhscore),
+						"away_score":   nilSafeInt(mascore),
+						"match_status": mstatus.String,
+						"league":       ln,
+					})
+				}
+			}
+		}
+
+		// Players (by resolved team ID). Use p.team_id = teamID.
+		playersQuery := `SELECT p.id, p.name, p.position, p.shirt_number, p.team_id, t.name_th as team_name, t.team_post_ballthai as team_post_id, p.photo_url, p.matches_played, p.goals, p.yellow_cards, p.red_cards, p.status, n.name as nationality, p.player_ref_id as player_post_id FROM players p LEFT JOIN teams t ON p.team_id = t.id LEFT JOIN nationalities n ON p.nationality_id = n.id WHERE p.team_id = ? ORDER BY p.shirt_number, p.name`
+		prow, err := DB.Query(playersQuery, teamID)
+		var players []Player
+		if err == nil {
+			defer prow.Close()
+			for prow.Next() {
+				var pl Player
+				var pos sql.NullString
+				var shirt sql.NullInt64
+				var teamIDsql sql.NullInt64
+				var teamName sql.NullString
+				var teamPost sql.NullString
+				var photo sql.NullString
+				var matchesPlayed sql.NullInt64
+				var goals sql.NullInt64
+				var yellow sql.NullInt64
+				var red sql.NullInt64
+				var status sql.NullInt64
+				var nat sql.NullString
+				var playerPost sql.NullInt64
+
+				if err := prow.Scan(&pl.ID, &pl.Name, &pos, &shirt, &teamIDsql, &teamName, &teamPost, &photo, &matchesPlayed, &goals, &yellow, &red, &status, &nat, &playerPost); err == nil {
+					if pos.Valid { p := pos.String; pl.Position = &p }
+					if shirt.Valid { v := int(shirt.Int64); pl.ShirtNumber = &v }
+					if teamIDsql.Valid { v := int(teamIDsql.Int64); pl.TeamID = &v }
+					if teamName.Valid { s := teamName.String; pl.TeamName = &s }
+					if teamPost.Valid { if tp, err := strconv.Atoi(teamPost.String); err == nil { pl.TeamPostID = &tp } }
+					if goals.Valid { v := int(goals.Int64); pl.Goals = &v }
+					if nat.Valid { s := nat.String; pl.Nationality = &s }
+					if playerPost.Valid { v := int(playerPost.Int64); pl.PlayerPostID = &v }
+					if photo.Valid { s := photo.String; pl.ProfileImage = &s }
+					if matchesPlayed.Valid { /* ignore or map if needed */ }
+					players = append(players, pl)
+				}
+			}
+		}
+
+		response := APIResponse{
+			Success: true,
+			Data: map[string]interface{}{
+				"team":         teamObj,
+				"next_matches": nextMatches,
+				"past_results": past,
+				"players":      players,
+			},
+		}
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	// Default: return list of teams
 	query := `
 		SELECT t.id, t.name_th, t.team_post_ballthai, t.stadium_id, s.name as stadium_name, 
-		       t.logo_url, NULL as established_year
+			   t.logo_url, NULL as established_year
 		FROM teams t 
 		LEFT JOIN stadiums s ON t.stadium_id = s.id
 		ORDER BY t.name_th
@@ -699,4 +864,12 @@ func GetStages(w http.ResponseWriter, r *http.Request) {
 	       Data:    stages,
        }
        json.NewEncoder(w).Encode(response)
+}
+
+// helper to convert sql.NullInt64 to *int or nil
+func nilSafeInt(n sql.NullInt64) interface{} {
+    if !n.Valid {
+        return nil
+    }
+    return int(n.Int64)
 }
