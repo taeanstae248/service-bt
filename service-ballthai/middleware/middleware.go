@@ -3,6 +3,7 @@ package middleware
 import (
 	"log"
 	"net/http"
+	"os"
 	"time"
 	"go-ballthai-scraper/database"
 )
@@ -48,7 +49,20 @@ func CheckAuth(next http.Handler) http.Handler {
 // CORS middleware
 func CORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		// Default allowed origin can be overridden with ALLOWED_ORIGIN env var
+		allowedOrigin := os.Getenv("ALLOWED_ORIGIN")
+		if allowedOrigin == "" {
+			allowedOrigin = "https://www.ballthai.com"
+		}
+
+		origin := r.Header.Get("Origin")
+		// Only set CORS headers when the request Origin matches the allowed origin.
+		if origin != "" && origin == allowedOrigin {
+			w.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
+			// Vary by Origin so caches know response varies
+			w.Header().Set("Vary", "Origin")
+		}
+
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
