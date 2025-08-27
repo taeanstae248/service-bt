@@ -319,12 +319,27 @@ func GetTeams(w http.ResponseWriter, r *http.Request) {
 					if nmHomeName.Valid { hm = nmHomeName.String }
 					if nmAwayName.Valid { am = nmAwayName.String }
 					if nmLeagueName.Valid { ln = nmLeagueName.String }
+					// lookup logos
+					var homeLogoVal interface{} = nil
+					var awayLogoVal interface{} = nil
+					if hm != "" {
+						if hl, err := database.GetTeamLogoByName(DB, hm); err == nil && hl != "" {
+							homeLogoVal = hl
+						}
+					}
+					if am != "" {
+						if al, err := database.GetTeamLogoByName(DB, am); err == nil && al != "" {
+							awayLogoVal = al
+						}
+					}
 					nextMatches = append(nextMatches, map[string]interface{}{
 						"id":           int(nmID.Int64),
 						"start_date":   nmDate.String,
 						"start_time":   nmTime.String,
 						"home_team":    hm,
 						"away_team":    am,
+						"home_logo":    homeLogoVal,
+						"away_logo":    awayLogoVal,
 						"home_score":   nilSafeInt(nmHomeScore),
 						"away_score":   nilSafeInt(nmAwayScore),
 						"match_status": nmStatus.String,
@@ -356,12 +371,26 @@ func GetTeams(w http.ResponseWriter, r *http.Request) {
 					if mhomeName.Valid { hm = mhomeName.String }
 					if mawayName.Valid { am = mawayName.String }
 					if mLeagueName.Valid { ln = mLeagueName.String }
+					var homeLogoVal interface{} = nil
+					var awayLogoVal interface{} = nil
+					if hm != "" {
+						if hl, err := database.GetTeamLogoByName(DB, hm); err == nil && hl != "" {
+							homeLogoVal = hl
+						}
+					}
+					if am != "" {
+						if al, err := database.GetTeamLogoByName(DB, am); err == nil && al != "" {
+							awayLogoVal = al
+						}
+					}
 					past = append(past, map[string]interface{}{
 						"id":           int(mid.Int64),
 						"start_date":   mdate.String,
 						"start_time":   mtime.String,
 						"home_team":    hm,
 						"away_team":    am,
+						"home_logo":    homeLogoVal,
+						"away_logo":    awayLogoVal,
 						"home_score":   nilSafeInt(mhscore),
 						"away_score":   nilSafeInt(mascore),
 						"match_status": mstatus.String,
