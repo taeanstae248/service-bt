@@ -80,6 +80,15 @@ function fetchMatches(dateParam) {
 }
 function addMatch() {
     // Fetch leagues, stage_name, teams, channels for dropdowns
+    const addMatchForm = document.getElementById('addMatchForm');
+    if (addMatchForm) {
+        addMatchForm.setAttribute('data-mode', 'add');
+    }
+    const modalTitleEl = document.querySelector('#addMatchModal h2');
+    if (modalTitleEl) modalTitleEl.textContent = 'เพิ่มแมทช์ใหม่';
+    // ensure match_id hidden field is cleared
+    const idInputExisting = document.getElementById('match_id');
+    if (idInputExisting) idInputExisting.value = '';
     fetch('/api/leagues').then(res => res.json()).then(leaguesData => {
         const leagueSelect = document.getElementById('league_select');
         leagueSelect.innerHTML = '<option value="">-- เลือกลีก --</option>';
@@ -125,6 +134,16 @@ function addMatch() {
                 } else {
                     liveChannelSelect.innerHTML += `<option value="${ch.id}">${ch.name}</option>`;
                 }
+            });
+        }
+    });
+    // เติมสนาม
+    fetch('/api/stadiums').then(res => res.json()).then(stadiumsData => {
+        const stadiumSelect = document.getElementById('stadium_select');
+        stadiumSelect.innerHTML = '<option value="">-- เลือกสนาม --</option>';
+        if (stadiumsData.success && Array.isArray(stadiumsData.data)) {
+            stadiumsData.data.forEach(s => {
+                stadiumSelect.innerHTML += `<option value="${s.id}">${s.name}</option>`;
             });
         }
     });
@@ -219,7 +238,9 @@ function editMatch(id) {
         .then(result => {
             if (!result || !result.success || !result.data) return;
             const match = result.data;
-            document.getElementById('addMatchModal').style.display = 'flex';
+            // โหลด option ทั้งหมด แล้วค่อย set value และแสดง modal เมื่อเสร็จ
+            // ตั้งโหมดเป็น edit ก่อนจะโหลด options เผื่อโค้ดอื่นตรวจสอบ
+            document.getElementById('addMatchForm').setAttribute('data-mode', 'edit');
             // โหลด option ทั้งหมด แล้วค่อย set value
             Promise.all([
                 fetch('/api/leagues').then(res => res.json()),
@@ -272,8 +293,8 @@ function editMatch(id) {
                     });
                 }
                 // set value หลังเติม option
-                leagueSelect.value = match.league_id || '';
-                stageSelect.value = match.stage_id || '';
+                leagueSelect.value = match.league_id != null ? String(match.league_id) : '';
+                stageSelect.value = match.stage_id != null ? String(match.stage_id) : '';
                 // แปลง start_date เป็น YYYY-MM-DD
                 let dateVal = '';
                 if (match.start_date) {
@@ -297,9 +318,20 @@ function editMatch(id) {
                 const liveChVal = match.live_channel_id != null ? String(match.live_channel_id) : '';
                 channelSelect.value = chVal;
                 liveChannelSelect.value = liveChVal;
+                // stadium
+                const stadiumSelect = document.getElementById('stadium_select');
+                stadiumSelect.value = match.stadium_id != null ? String(match.stadium_id) : '';
                 document.getElementById('home_score').value = match.home_score ?? 0;
                 document.getElementById('away_score').value = match.away_score ?? 0;
-                document.getElementById('match_status_select').value = match.match_status || 'ADD';
+                // Ensure match_status options include 'ADD' and set value
+                const matchStatusSelect = document.getElementById('match_status_select');
+                if (!Array.from(matchStatusSelect.options).some(o => o.value === 'ADD')) {
+                    const opt = document.createElement('option');
+                    opt.value = 'ADD';
+                    opt.textContent = 'ADD - (ไม่ระบุ)';
+                    matchStatusSelect.insertBefore(opt, matchStatusSelect.firstChild);
+                }
+                matchStatusSelect.value = match.match_status || 'ADD';
                 // เพิ่ม hidden input สำหรับ id
                 let idInput = document.getElementById('match_id');
                 if (!idInput) {
@@ -311,6 +343,13 @@ function editMatch(id) {
                 }
                 idInput.value = match.id;
                 document.getElementById('addMatchForm').setAttribute('data-mode', 'edit');
+                // update modal title and submit button so user sees edit mode
+                const modalTitleEl = document.querySelector('#addMatchModal h2');
+                if (modalTitleEl) modalTitleEl.textContent = 'แก้ไขแมทช์';
+                const submitBtn = document.querySelector('#addMatchForm button[type="submit"]');
+                if (submitBtn) submitBtn.textContent = 'บันทึกการแก้ไข';
+                // แสดง modal หลังเติม options และตั้งค่าเสร็จ
+                document.getElementById('addMatchModal').style.display = 'flex';
             });
         })
         .catch(err => {

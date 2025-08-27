@@ -186,8 +186,8 @@ func GetMatchByID(w http.ResponseWriter, r *http.Request) {
 		SELECT m.id, m.league_id, m.stage_id, m.start_date, m.start_time,
 			   m.home_team_id, m.away_team_id, m.home_score, m.away_score,
 			   m.match_status, m.channel_id, m.live_channel_id,
-			   ht.name_th as home_team, at.name_th as away_team,
-			   s.name as stadium, l.name as league_name,
+		       ht.name_th as home_team, at.name_th as away_team,
+		       s.id as stadium_id, s.name as stadium, l.name as league_name,
 			   ht.team_post_ballthai as team_post_home, at.team_post_ballthai as team_post_away
 		FROM matches m
 		LEFT JOIN teams ht ON m.home_team_id = ht.id
@@ -212,6 +212,7 @@ func GetMatchByID(w http.ResponseWriter, r *http.Request) {
 		LiveChannelID *int    `json:"live_channel_id"`
 		HomeTeam      string  `json:"home_team"`
 		AwayTeam      string  `json:"away_team"`
+		StadiumID     *int    `json:"stadium_id"`
 		Stadium       *string `json:"stadium"`
 		LeagueName    *string `json:"league_name"`
 		TeamPostHome  *string `json:"team_post_home"`
@@ -221,7 +222,7 @@ func GetMatchByID(w http.ResponseWriter, r *http.Request) {
 	err = row.Scan(&resp.ID, &resp.LeagueID, &resp.StageID, &resp.StartDate, &resp.StartTime,
 		&resp.HomeTeamID, &resp.AwayTeamID, &resp.HomeScore, &resp.AwayScore,
 		&resp.MatchStatus, &resp.ChannelID, &resp.LiveChannelID,
-		&resp.HomeTeam, &resp.AwayTeam, &resp.Stadium, &resp.LeagueName,
+		&resp.HomeTeam, &resp.AwayTeam, &resp.StadiumID, &resp.Stadium, &resp.LeagueName,
 		&resp.TeamPostHome, &resp.TeamPostAway)
 	if err == sql.ErrNoRows {
 		http.Error(w, `{"success": false, "error": "Match not found"}`, http.StatusNotFound)
@@ -671,7 +672,7 @@ func GetMatches(w http.ResponseWriter, r *http.Request) {
 // GetStages returns unique stage_name from stage table
 func GetStages(w http.ResponseWriter, r *http.Request) {
        w.Header().Set("Content-Type", "application/json")
-       query := `SELECT id, stage_name, league_id FROM stage WHERE stage_name IS NOT NULL AND stage_name != '' ORDER BY stage_name`
+	query := `SELECT id, stage_name FROM stage WHERE stage_name IS NOT NULL AND stage_name != '' ORDER BY stage_name`
        rows, err := DB.Query(query)
        if err != nil {
 	       http.Error(w, fmt.Sprintf("Database error: %v", err), http.StatusInternalServerError)
@@ -679,17 +680,15 @@ func GetStages(w http.ResponseWriter, r *http.Request) {
        }
        defer rows.Close()
        var stages []struct {
-	       ID        int    `json:"id"`
-	       StageName string `json:"stage_name"`
-	       LeagueID  int    `json:"league_id"`
+       ID        int    `json:"id"`
+       StageName string `json:"stage_name"`
        }
        for rows.Next() {
-	       var s struct {
-		       ID        int    `json:"id"`
-		       StageName string `json:"stage_name"`
-		       LeagueID  int    `json:"league_id"`
-	       }
-	       if err := rows.Scan(&s.ID, &s.StageName, &s.LeagueID); err != nil {
+       var s struct {
+	       ID        int    `json:"id"`
+	       StageName string `json:"stage_name"`
+       }
+       if err := rows.Scan(&s.ID, &s.StageName); err != nil {
 		       http.Error(w, fmt.Sprintf("Scan error: %v", err), http.StatusInternalServerError)
 		       return
 	       }
