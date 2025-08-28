@@ -24,7 +24,7 @@ type JLeagueStandingConfig struct {
 	Name     string
 }
 
-// ScrapeJLeagueStandings scrapes J-League standings from Kapook website
+	// ScrapeJLeagueStandings scrapes J-League standings from the official J.League site
 func ScrapeJLeagueStandings(db *sql.DB) error {
 	// Get or create J-League in database
 	leagueID, err := getOrCreateLeague(db, "J-League Division 1")
@@ -33,7 +33,7 @@ func ScrapeJLeagueStandings(db *sql.DB) error {
 	}
 
 	config := JLeagueStandingConfig{
-		URL:      "https://football.kapook.com/tournament/jleague/table",
+		URL:      "https://www.jleague.co/th/standings/j1/2025/",
 		LeagueID: leagueID, // Dynamic J-League ID from database
 		Name:     "J-League",
 	}
@@ -57,8 +57,8 @@ func ScrapeJLeagueStandings(db *sql.DB) error {
 		return fmt.Errorf("failed to parse HTML: %v", err)
 	}
 
-	// Find league table (similar to your PHP: '.league table')
-       doc.Find(".league table tbody tr").Each(func(i int, s *goquery.Selection) {
+	// Find standings table rows on jleague.co ('.standing-table tbody tr')
+	doc.Find(".standing-table tbody tr").Each(func(i int, s *goquery.Selection) {
 	       // Extract team data from each row
 	       teamData := extractJLeagueTeamData(s)
 	       if teamData == nil {
@@ -135,11 +135,19 @@ func extractJLeagueTeamData(s *goquery.Selection) *JLeagueTeamData {
 
 	// Team name and logo (column 1)
 	teamCell := s.Find("td").Eq(1)
-	teamData.Name = strings.TrimSpace(teamCell.Text())
 
-	// Extract logo URL
-	if logoImg := teamCell.Find("a img").First(); logoImg.Length() > 0 {
-		if logoURL, exists := logoImg.Attr("src"); exists {
+	// Prefer the club-item__name text (Thai name) if present
+	nameText := strings.TrimSpace(teamCell.Find(".club-item__name").Text())
+	if nameText == "" {
+		nameText = strings.TrimSpace(teamCell.Text())
+	}
+	teamData.Name = nameText
+
+	// Extract logo URL from data-src or src attributes on the emblem image
+	if logoImg := teamCell.Find(".club-emblem__image").First(); logoImg.Length() > 0 {
+		if logoURL, exists := logoImg.Attr("data-src"); exists && logoURL != "" {
+			teamData.LogoURL = logoURL
+		} else if logoURL, exists := logoImg.Attr("src"); exists {
 			teamData.LogoURL = logoURL
 		}
 	}
@@ -196,6 +204,10 @@ func downloadTeamLogo(logoURL string) string {
 	// Fix relative URLs by adding https scheme
 	if strings.HasPrefix(logoURL, "//") {
 		logoURL = "https:" + logoURL
+	}
+	// Make root-relative URLs absolute for jleague.co
+	if strings.HasPrefix(logoURL, "/") {
+		logoURL = "https://www.jleague.co" + logoURL
 	}
 
 	// Create logo path into img/teams
