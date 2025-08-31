@@ -52,8 +52,12 @@ func CreateTeam(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if team.NameTh == "" {
-		http.Error(w, `{"success": false, "error": "Team name is required"}`, http.StatusBadRequest)
-		return
+		if team.Name != "" {
+			team.NameTh = team.Name
+		} else {
+			http.Error(w, `{"success": false, "error": "Team name is required"}`, http.StatusBadRequest)
+			return
+		}
 	}
 
 	// Normalize logo URL before saving
