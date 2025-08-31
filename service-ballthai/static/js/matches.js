@@ -58,9 +58,30 @@ function fetchMatches(dateParam) {
                             const d = new Date(match.start_date);
                             timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                         }
+                        
+                        // แสดงสถานะการแข่งขันอย่างเหมาะสม
+                        let statusDisplay = '';
+                        if (match.match_status) {
+                            switch (match.match_status) {
+                                case 'SLIP':
+                                    statusDisplay = ' <span style="color: #ff6b35; font-weight: bold;">[SLIP]</span>';
+                                    break;
+                                case 'FINISHED':
+                                    statusDisplay = ' <span style="color: #4caf50; font-weight: bold;">[จบ]</span>';
+                                    break;
+                                case 'OFF':
+                                    statusDisplay = ' <span style="color: #9e9e9e; font-weight: bold;">[ปิด]</span>';
+                                    break;
+                                case 'ADD':
+                                default:
+                                    statusDisplay = ' <span style="color: #2196f3; font-weight: bold;">[ใหม่]</span>';
+                                    break;
+                            }
+                        }
+                        
                         tbody.innerHTML += `
                             <tr>
-                                <td>${timeStr}  ${match.match_status || ''}</td>
+                                <td>${timeStr}${statusDisplay}</td>
                                 <td class="home-team">${match.home_team || ''}</td>
                                 <td class="score-center">${match.home_score ?? ''} - ${match.away_score ?? ''}</td>
                                 <td>${match.away_team || ''}</td>
@@ -323,13 +344,19 @@ function editMatch(id) {
                 stadiumSelect.value = match.stadium_id != null ? String(match.stadium_id) : '';
                 document.getElementById('home_score').value = match.home_score ?? 0;
                 document.getElementById('away_score').value = match.away_score ?? 0;
-                // Ensure match_status options include 'ADD' and set value
+                // Ensure match_status options include 'ADD' and 'SLIP' and set value
                 const matchStatusSelect = document.getElementById('match_status_select');
                 if (!Array.from(matchStatusSelect.options).some(o => o.value === 'ADD')) {
                     const opt = document.createElement('option');
                     opt.value = 'ADD';
                     opt.textContent = 'ADD - (ไม่ระบุ)';
                     matchStatusSelect.insertBefore(opt, matchStatusSelect.firstChild);
+                }
+                if (!Array.from(matchStatusSelect.options).some(o => o.value === 'SLIP')) {
+                    const opt = document.createElement('option');
+                    opt.value = 'SLIP';
+                    opt.textContent = 'SLIP - สำหรับการเดิมพัน';
+                    matchStatusSelect.insertBefore(opt, matchStatusSelect.firstChild.nextSibling);
                 }
                 matchStatusSelect.value = match.match_status || 'ADD';
                 // เพิ่ม hidden input สำหรับ id
