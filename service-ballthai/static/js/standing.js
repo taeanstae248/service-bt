@@ -207,13 +207,6 @@ function showEditStandingModal(standing) {
             <label>เสีย: <input type="number" name="goals_against" value="${standing.goals_against||0}" min="0" required></label><br><br>
             <label>ผลต่าง: <input type="number" name="goal_difference" value="${standing.goal_difference||0}" required></label><br><br>
             <label>แต้ม: <input type="number" name="points" value="${standing.points||0}" min="0" required></label><br><br>
-            <label>อันดับ: <input type="number" name="current_rank" value="${standing.current_rank?.Int64||1}" min="1" required></label><br><br>
-            <label>สถานะ: 
-                <select name="status" required>
-                    <option value="0" ${selectedStatus==0?'selected':''}>ON - เปิดการดึง</option>
-                    <option value="1" ${selectedStatus==1?'selected':''}>OFF - ปิดการดึง</option>
-                </select>
-            </label><br><br>
             <div style="text-align:right">
                 <button type="button" id="cancelEditStanding">ยกเลิก</button>
                 <button type="submit" style="background:#667eea;color:#fff;border:none;padding:0.5rem 1.5rem;border-radius:5px;">บันทึก</button>
