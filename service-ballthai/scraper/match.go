@@ -138,9 +138,9 @@ func scrapeMatchesPage(db *sql.DB, baseURL string, page int, tournamentParam str
 
 		var currentStatus string
 		err := db.QueryRow("SELECT match_status FROM matches WHERE match_ref_id = ?", apiMatch.ID).Scan(&currentStatus)
-		if err == nil && currentStatus == "OFF" {
-			log.Printf("Skip update match %d (status=OFF)", apiMatch.ID)
-			continue
+		if err == nil && (currentStatus == "OFF" || currentStatus == "SLIP") {
+			log.Printf("Skip update match %d (status=%s)", apiMatch.ID, currentStatus)
+    		continue
 		}
 
 		var homeTeamID, awayTeamID int
