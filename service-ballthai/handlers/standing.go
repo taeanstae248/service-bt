@@ -164,6 +164,7 @@ func GetStandings(w http.ResponseWriter, r *http.Request) {
 	       "bgc": "BGC Cup",
 	       "samipro": "Samipro",
 	       "t1-jpy": "J1 League",
+		   "pea-u21": "PEA U-21 YOUNGSTER LEAGUE",
        }
 	w.Header().Set("Content-Type", "application/json")
        leagueIDStr := r.URL.Query().Get("league_id")
@@ -182,6 +183,7 @@ func GetStandings(w http.ResponseWriter, r *http.Request) {
 		  case "t3": leagueID = 3
 		  case "samipro": leagueID = 59
 		  case "t1-jpy": leagueID = 60
+		  case "pea-u21": leagueID = 61
 		  default:
 			  http.Error(w, `{"success": false, "error": "invalid league_id"}`, http.StatusBadRequest)
 			  return
