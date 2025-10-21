@@ -197,9 +197,12 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('submit event fired'); // เพิ่ม log ตรงนี้
             const formData = new FormData(addMatchForm);
             // ...existing code เตรียม payload...
+            // Prepare stage_id: omit the property entirely when user selects "0" (meaning unspecified)
+            const _stageVal = formData.get('stage_name');
+            const _stageId = (_stageVal && _stageVal !== '0') ? Number(_stageVal) : undefined;
+
             const payload = {
                 league_id: Number(formData.get('league_id')),
-                stage_id: formData.get('stage_name') ? Number(formData.get('stage_name')) : null,
                 start_date: formData.get('start_date'),
                 start_time: formData.get('start_time'),
                 home_team_id: Number(formData.get('home_team_id')),
@@ -210,6 +213,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 channel_id: formData.get('channel_id') ? Number(formData.get('channel_id')) : null,
                 live_channel_id: formData.get('live_channel_id') ? Number(formData.get('live_channel_id')) : null
             };
+            // Only include stage_id when it's a real number. Setting it to undefined will omit it from JSON.
+            if (_stageId !== undefined) {
+                payload.stage_id = _stageId;
+            }
             console.log('channel_id', formData.get('channel_id'));
             console.log('live_channel_id', formData.get('live_channel_id'));
             console.log('payload', payload);

@@ -164,8 +164,13 @@ func UpdateMatch(w http.ResponseWriter, r *http.Request) {
 		channel_id = ?,
 		live_channel_id = ?
 		WHERE id = ?`
+	// Normalize stage_id: treat 0 or missing as NULL to avoid FK violation (no stage.id == 0)
+	var stageID interface{} = nil
+	if req.StageID != nil && *req.StageID > 0 {
+		stageID = *req.StageID
+	}
 	_, err = DB.Exec(query,
-		req.LeagueID, req.StageID, req.StartDate, req.StartTime,
+		req.LeagueID, stageID, req.StartDate, req.StartTime,
 		req.HomeTeamID, req.AwayTeamID, req.HomeScore, req.AwayScore,
 		req.MatchStatus, req.ChannelID, req.LiveChannelID, id,
 	)
