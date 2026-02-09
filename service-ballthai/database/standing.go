@@ -165,6 +165,16 @@ func InsertOrUpdateStanding(db *sql.DB, standing models.StandingDB) error {
 	if standing.StageID.Valid {
 		log.Printf("[InsertOrUpdateStanding] Looking for existing standing (league=%d team=%d stage=%d)", standing.LeagueID, standing.TeamID, standing.StageID.Int64)
 		err = db.QueryRow("SELECT id FROM standings WHERE league_id = ? AND team_id = ? AND stage_id = ?", standing.LeagueID, standing.TeamID, standing.StageID.Int64).Scan(&existingStandingID)
+		
+		// If not found with stage_id, try to find record with NULL stage_id and update it
+		if err == sql.ErrNoRows {
+			log.Printf("[InsertOrUpdateStanding] Not found with stage=%d, looking for existing record with stage_id=NULL", standing.StageID.Int64)
+			err = db.QueryRow("SELECT id FROM standings WHERE league_id = ? AND team_id = ? AND stage_id IS NULL", standing.LeagueID, standing.TeamID).Scan(&existingStandingID)
+			if err == nil {
+				// Found with NULL stage_id, will update it with new stage_id
+				log.Printf("[InsertOrUpdateStanding] Found existing standing with NULL stage_id, will update with stage=%d", standing.StageID.Int64)
+			}
+		}
 	} else {
 		log.Printf("[InsertOrUpdateStanding] Looking for existing standing (league=%d team=%d stage=NULL)", standing.LeagueID, standing.TeamID)
 		err = db.QueryRow("SELECT id FROM standings WHERE league_id = ? AND team_id = ? AND stage_id IS NULL", standing.LeagueID, standing.TeamID).Scan(&existingStandingID)
@@ -192,17 +202,17 @@ func InsertOrUpdateStanding(db *sql.DB, standing models.StandingDB) error {
 	} else if err != nil {
 		return fmt.Errorf("failed to query existing standing for team %d in league %d stage %v: %w", standing.TeamID, standing.LeagueID, standing.StageID, err)
 	} else {
-		// Update existing standing (เพิ่ม stage_id, status)
+		// Update existing standing (including stage_id if provided)
 		updateQuery := `
 		       UPDATE standings SET
-			       status = ?, matches_played = ?, wins = ?, draws = ?, losses = ?,
+			       stage_id = ?, status = ?, matches_played = ?, wins = ?, draws = ?, losses = ?,
 			       goals_for = ?, goals_against = ?, goal_difference = ?, points = ?, current_rank = ?
 		       WHERE id = ?
 	       `
 		    statusVal := standing.Status
 		    if !statusVal.Valid { statusVal.Int64 = 0; statusVal.Valid = true }
 		    _, err := db.Exec(updateQuery,
-			    statusVal, standing.MatchesPlayed, standing.Wins, standing.Draws, standing.Losses,
+			    standing.StageID, statusVal, standing.MatchesPlayed, standing.Wins, standing.Draws, standing.Losses,
 			    standing.GoalsFor, standing.GoalsAgainst, standing.GoalDifference, standing.Points, standing.CurrentRank,
 			    existingStandingID,
 		    )

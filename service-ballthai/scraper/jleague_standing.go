@@ -22,9 +22,10 @@ type JLeagueStandingConfig struct {
 	URL      string
 	LeagueID int
 	Name     string
+	StageName string
 }
 
-	// ScrapeJLeagueStandings scrapes J-League standings from the official J.League site
+// ScrapeJLeagueStandings scrapes J-League standings from both EAST and WEST stages
 func ScrapeJLeagueStandings(db *sql.DB) error {
 	// Get or create J-League in database
 	leagueID, err := getOrCreateLeague(db, "J-League Division 1")
@@ -32,16 +33,38 @@ func ScrapeJLeagueStandings(db *sql.DB) error {
 		return fmt.Errorf("failed to get or create J-League: %v", err)
 	}
 
-	config := JLeagueStandingConfig{
-		URL:      "https://www.jleague.co/th/standings/j1/2025/",
-		LeagueID: leagueID, // Dynamic J-League ID from database
-		Name:     "J-League",
+	// Scrape both EAST and WEST stages
+	stages := []struct {
+		name string
+		url  string
+	}{
+		{"east", "https://www.thscore.mobi/football/database/league-25/3540"},
+		{"west", "https://www.thscore.mobi/football/database/league-25/3541"},
 	}
 
-	log.Printf("Scraping J-League standings from: %s", config.URL)
+	for _, stage := range stages {
+		if err := scrapeJLeagueStandingsByStage(db, leagueID, stage.name, stage.url); err != nil {
+			log.Printf("Error scraping %s stage: %v", stage.name, err)
+		}
+	}
+
+	log.Printf("Completed scraping J-League standings for all stages")
+	return nil
+}
+
+// scrapeJLeagueStandingsByStage scrapes J-League standings for a specific stage
+func scrapeJLeagueStandingsByStage(db *sql.DB, leagueID int, stageName, url string) error {
+
+	log.Printf("Scraping J-League standings for %s stage from: %s", stageName, url)
+
+	// Get or create stage
+	stageID, err := getOrCreateStage(db, stageName)
+	if err != nil {
+		return fmt.Errorf("failed to get or create stage %s: %v", stageName, err)
+	}
 
 	// Fetch HTML content
-	resp, err := http.Get(config.URL)
+	resp, err := http.Get(url)
 	if err != nil {
 		return fmt.Errorf("failed to fetch J-League standings: %v", err)
 	}
@@ -57,54 +80,168 @@ func ScrapeJLeagueStandings(db *sql.DB) error {
 		return fmt.Errorf("failed to parse HTML: %v", err)
 	}
 
-	// Find standings table rows on jleague.co ('.standing-table tbody tr')
-	doc.Find(".standing-table tbody tr").Each(func(i int, s *goquery.Selection) {
-	       // Extract team data from each row
-	       teamData := extractJLeagueTeamData(s)
-	       if teamData == nil {
-		       return // Skip invalid rows
-	       }
+	// Extract team names and logos from the first table in .rankbox
+	var teamsList []map[string]string
+	doc.Find(".rankbox table.eTable tbody tr").Each(func(i int, s *goquery.Selection) {
+		// Skip header row
+		if s.Find("th").Length() > 0 {
+			return
+		}
 
-	       // Download team logo if needed
-	       if teamData.LogoURL != "" {
-		       teamData.LogoPath = downloadTeamLogo(teamData.LogoURL)
-	       }
+		cells := s.Find("td")
+		if cells.Length() < 3 {
+			return
+		}
 
-	       // Get or create team ID
-	       teamID, err := getOrCreateTeamID(db, teamData.Name, teamData.LogoPath, config.LeagueID)
-	       if err != nil {
-		       log.Printf("Error getting team ID for %s: %v", teamData.Name, err)
-		       return
-	       }
+		// Extract rank
+		rank := strings.TrimSpace(cells.Eq(0).Find("span.whiteTxt").Text())
 
-	       // Prepare standing data
-	       standingDB := models.StandingDB{
-		       LeagueID:       config.LeagueID,
-		       TeamID:         teamID,
-		       MatchesPlayed:  teamData.Played,
-		       Wins:           teamData.Wins,
-		       Draws:          teamData.Draws,
-		       Losses:         teamData.Losses,
-		       GoalsFor:       teamData.GoalsFor,
-		       GoalsAgainst:   teamData.GoalsAgainst,
-		       GoalDifference: teamData.GoalDifference,
-		       Points:         teamData.Points,
-		       CurrentRank:    sql.NullInt64{Int64: int64(teamData.Position), Valid: teamData.Position != 0},
-		       Status:         sql.NullInt64{Valid: false}, // เพิ่ม status (null)
-	       }
+		// Extract team logo URL
+		logoURL := ""
+		if img := cells.Eq(1).Find("img.teamIcon"); img.Length() > 0 {
+			if src, exists := img.Attr("src"); exists {
+				logoURL = src
+			}
+		}
 
-	       // Insert or update standing in database
-	       err = database.InsertOrUpdateStanding(db, standingDB)
-	       if err != nil {
-		       log.Printf("Error saving standing for team %s: %v", teamData.Name, err)
-	       } else {
-		       log.Printf("Successfully saved standing for %s (Position: %d, Points: %d)",
-			       teamData.Name, teamData.Position, teamData.Points)
-	       }
-       })
+		// Extract team name
+		teamName := strings.TrimSpace(cells.Eq(2).Find("a.LName").Text())
 
-	log.Printf("Completed scraping J-League standings")
+		if teamName != "" && rank != "" {
+			teamsList = append(teamsList, map[string]string{
+				"rank":     rank,
+				"name":     teamName,
+				"logoURL":  logoURL,
+			})
+		}
+	})
+
+	// Extract statistics from the second table in .rankdata
+	var statsList []map[string]string
+	doc.Find(".rankdata table.eTable tbody tr").Each(func(i int, s *goquery.Selection) {
+		// Skip header row
+		if s.Find("th").Length() > 0 {
+			return
+		}
+
+		cells := s.Find("td")
+		if cells.Length() < 13 {
+			return
+		}
+
+		// Extract statistics
+		played := strings.TrimSpace(cells.Eq(0).Text())
+		wins := strings.TrimSpace(cells.Eq(1).Text())
+		draws := strings.TrimSpace(cells.Eq(2).Text())
+		losses := strings.TrimSpace(cells.Eq(3).Text())
+		points := strings.TrimSpace(cells.Eq(4).Text())
+		goalsFor := strings.TrimSpace(cells.Eq(5).Text())
+		goalsAgainst := strings.TrimSpace(cells.Eq(6).Text())
+		goalDiff := strings.TrimSpace(cells.Eq(7).Text())
+
+		statsList = append(statsList, map[string]string{
+			"played":       played,
+			"wins":         wins,
+			"draws":        draws,
+			"losses":       losses,
+			"points":       points,
+			"goalsFor":     goalsFor,
+			"goalsAgainst": goalsAgainst,
+			"goalDiff":     goalDiff,
+		})
+	})
+
+	// Match teams with their statistics by position
+	for pos := 0; pos < len(teamsList) && pos < len(statsList); pos++ {
+		teamInfo := teamsList[pos]
+		statsInfo := statsList[pos]
+
+		teamData := &JLeagueTeamData{
+			Position:       pos + 1,
+			Name:           teamInfo["name"],
+			LogoURL:        teamInfo["logoURL"],
+			Played:         atoi(statsInfo["played"]),
+			Wins:           atoi(statsInfo["wins"]),
+			Draws:          atoi(statsInfo["draws"]),
+			Losses:         atoi(statsInfo["losses"]),
+			Points:         atoi(statsInfo["points"]),
+			GoalsFor:       atoi(statsInfo["goalsFor"]),
+			GoalsAgainst:   atoi(statsInfo["goalsAgainst"]),
+			GoalDifference: atoi(statsInfo["goalDiff"]),
+		}
+
+		// Download team logo if needed
+		if teamData.LogoURL != "" {
+			teamData.LogoPath = downloadTeamLogo(teamData.LogoURL)
+		}
+
+		// Get or create team ID
+		teamID, err := getOrCreateTeamID(db, teamData.Name, teamData.LogoPath, leagueID)
+		if err != nil {
+			log.Printf("Error getting team ID for %s: %v", teamData.Name, err)
+			continue
+		}
+
+		// Prepare standing data
+		standingDB := models.StandingDB{
+			LeagueID:       leagueID,
+			TeamID:         teamID,
+			MatchesPlayed:  teamData.Played,
+			Wins:           teamData.Wins,
+			Draws:          teamData.Draws,
+			Losses:         teamData.Losses,
+			GoalsFor:       teamData.GoalsFor,
+			GoalsAgainst:   teamData.GoalsAgainst,
+			GoalDifference: teamData.GoalDifference,
+			Points:         teamData.Points,
+			CurrentRank:    sql.NullInt64{Int64: int64(teamData.Position), Valid: teamData.Position != 0},
+			StageID:        sql.NullInt64{Int64: stageID, Valid: true}, // เพิ่ม stage_id
+			Status:         sql.NullInt64{Valid: false}, // เพิ่ม status (null)
+		}
+
+		// Insert or update standing in database
+		err = database.InsertOrUpdateStanding(db, standingDB)
+		if err != nil {
+			log.Printf("Error saving standing for team %s: %v", teamData.Name, err)
+		} else {
+			log.Printf("Successfully saved standing for %s (Position: %d, Points: %d)",
+				teamData.Name, teamData.Position, teamData.Points)
+		}
+	}
+
 	return nil
+}
+
+// getOrCreateStage gets stage ID or creates new stage if not exists
+func getOrCreateStage(db *sql.DB, stageName string) (int64, error) {
+	// Try to find existing stage
+	var stageID int64
+	query := `SELECT id FROM stage WHERE stage_name = ? LIMIT 1`
+	err := db.QueryRow(query, stageName).Scan(&stageID)
+
+	if err == nil {
+		log.Printf("Found existing stage: %s (ID: %d)", stageName, stageID)
+		return stageID, nil // Stage found
+	}
+
+	if err != sql.ErrNoRows {
+		return 0, fmt.Errorf("error searching for stage: %v", err)
+	}
+
+	// Stage not found, create new one
+	insertQuery := `INSERT INTO stage (stage_name) VALUES (?)`
+	result, err := db.Exec(insertQuery, stageName)
+	if err != nil {
+		return 0, fmt.Errorf("error creating new stage: %v", err)
+	}
+
+	newStageID, err := result.LastInsertId()
+	if err != nil {
+		return 0, fmt.Errorf("error getting new stage ID: %v", err)
+	}
+
+	log.Printf("Created new stage: %s (ID: %d)", stageName, newStageID)
+	return newStageID, nil
 }
 
 // JLeagueTeamData represents team data extracted from the table
@@ -123,58 +260,12 @@ type JLeagueTeamData struct {
 	Points         int
 }
 
-// extractJLeagueTeamData extracts team data from a table row
-func extractJLeagueTeamData(s *goquery.Selection) *JLeagueTeamData {
-	teamData := &JLeagueTeamData{}
-
-	// Position (column 0)
-	positionText := strings.TrimSpace(s.Find("td").Eq(0).Text())
-	if pos, err := strconv.Atoi(positionText); err == nil {
-		teamData.Position = pos
-	}
-
-	// Team name and logo (column 1)
-	teamCell := s.Find("td").Eq(1)
-
-	// Prefer the club-item__name text (Thai name) if present
-	nameText := strings.TrimSpace(teamCell.Find(".club-item__name").Text())
-	if nameText == "" {
-		nameText = strings.TrimSpace(teamCell.Text())
-	}
-	teamData.Name = nameText
-
-	// Extract logo URL from data-src or src attributes on the emblem image
-	if logoImg := teamCell.Find(".club-emblem__image").First(); logoImg.Length() > 0 {
-		if logoURL, exists := logoImg.Attr("data-src"); exists && logoURL != "" {
-			teamData.LogoURL = logoURL
-		} else if logoURL, exists := logoImg.Attr("src"); exists {
-			teamData.LogoURL = logoURL
-		}
-	}
-
-	// Handle team name mapping (similar to your PHP)
-	teamData.Name = mapJLeagueTeamName(teamData.Name)
-
-	// Extract other statistics
-	cells := s.Find("td")
-	if cells.Length() >= 10 {
-		teamData.Played, _ = strconv.Atoi(strings.TrimSpace(cells.Eq(2).Text()))
-		teamData.Wins, _ = strconv.Atoi(strings.TrimSpace(cells.Eq(3).Text()))
-		teamData.Draws, _ = strconv.Atoi(strings.TrimSpace(cells.Eq(4).Text()))
-		teamData.Losses, _ = strconv.Atoi(strings.TrimSpace(cells.Eq(5).Text()))
-		teamData.GoalsFor, _ = strconv.Atoi(strings.TrimSpace(cells.Eq(6).Text()))
-		teamData.GoalsAgainst, _ = strconv.Atoi(strings.TrimSpace(cells.Eq(7).Text()))
-		teamData.GoalDifference, _ = strconv.Atoi(strings.TrimSpace(cells.Eq(8).Text()))
-		teamData.Points, _ = strconv.Atoi(strings.TrimSpace(cells.Eq(9).Text()))
-	}
-
-	// Validate that we have essential data
-	if teamData.Name == "" || teamData.Position == 0 {
-		return nil
-	}
-
-	return teamData
+// atoi converts string to int, returns 0 if conversion fails
+func atoi(s string) int {
+	i, _ := strconv.Atoi(strings.TrimSpace(s))
+	return i
 }
+
 
 // mapJLeagueTeamName maps team names (similar to your PHP logic)
 func mapJLeagueTeamName(name string) string {
@@ -205,9 +296,13 @@ func downloadTeamLogo(logoURL string) string {
 	if strings.HasPrefix(logoURL, "//") {
 		logoURL = "https:" + logoURL
 	}
-	// Make root-relative URLs absolute for jleague.co
+	// Make root-relative URLs absolute for different sources
 	if strings.HasPrefix(logoURL, "/") {
-		logoURL = "https://www.jleague.co" + logoURL
+		if strings.Contains(logoURL, "football.thscore") {
+			logoURL = "https://football.thscore2.com" + logoURL
+		} else {
+			logoURL = "https://www.jleague.co" + logoURL
+		}
 	}
 
 	// Create logo path into img/teams
