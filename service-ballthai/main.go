@@ -68,6 +68,22 @@ func main() {
 		   log.Println("cron fetch /scraper/standings status:", resp.Status)
 	   })
    }
+
+   jleagueTimes := []string{
+	   "0 */12 * *",  // 01:00 - J-League standings
+   }
+   for _, expr := range jleagueTimes {
+	   c.AddFunc(expr, func() {
+		   url := baseURL + "/scraper/jleague"
+		   resp, err := http.Get(url)
+		   if err != nil {
+			   log.Println("cron fetch error /scraper/jleague:", err)
+			   return
+		   }
+		   defer resp.Body.Close()
+		   log.Println("cron fetch /scraper/jleague status:", resp.Status)
+	   })
+   }
    c.Start()
 // ...existing code...
 	// ...existing code...
